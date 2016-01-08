@@ -16,27 +16,19 @@ namespace KKClientServer
         public MainView()
         {
             InitializeComponent();
-            this.fileTransferTabs.DrawItem += new DrawItemEventHandler(DrawOnTabPage);
         }
-
-        private void onServerStartBtn_Click(object sender, EventArgs e)
+        private void onMainView_Shown(object sender, EventArgs e)
         {
-            // TODO: Start TCP listener
+            // TODO: start TCP listener
             print("Starting server...");
-
-            // update controls enability
-            this.serverStopBtn.Enabled = true;
-            this.serverStartBtn.Enabled = false;
         }
 
-        private void onServerStopBtn_Click(object sender, EventArgs e)
+        private void onMainView_Closing(object sender, FormClosingEventArgs e)
         {
-            // TODO: Stop TCP listener
+            // TODO: stop TCP listener
             print("Stopping server...");
-
-            // update controls enability
-            this.serverStartBtn.Enabled = true;
-            this.serverStopBtn.Enabled = false;
+            
+            // TODO: misc cleanup
         }
 
         private void onConnectBtn_Click(object sender, EventArgs e)
@@ -48,9 +40,6 @@ namespace KKClientServer
             {
                 print("Connected to \"" + this.selectServerTB.Text + "\".");
                 addConnectionTab(this.selectServerTB.Text);
-
-                // update controls enability
-                updateSendControls();
             }
         }
 
@@ -84,93 +73,19 @@ namespace KKClientServer
             }
         }
 
-        private void onFileTransferTabs_MouseDown(object sender, MouseEventArgs e)
-        {
-            for (int i = 0; i < this.fileTransferTabs.TabPages.Count; i++)
-            {
-                Rectangle r = this.fileTransferTabs.GetTabRect(i);
-                // get position of close icon.
-                Rectangle closeButton = new Rectangle(r.Right - 15, r.Top + 4, 9, 7);
-                //if (closeButton.Contains(e.Location))
-                //{
-                //    this.fileTransferTabs.TabPages.RemoveAt(i);
-                //    break;
-                //}
-            }
-        }
-
-        private void DrawOnTabPage(object sender, DrawItemEventArgs e)
-        {
-            Graphics g = e.Graphics;
-            Pen p = new Pen(Color.Blue);
-            //g.DrawRectangle(p, myTabRect);
-        }
-
         private void addConnectionTab(string serverName)
         {
-            // create columns
-            ColumnHeader fileTransferIDCol = new ColumnHeader();
-            fileTransferIDCol.Text = "ID";
-            fileTransferIDCol.Width = 60;
-            ColumnHeader fileTransferNameCol = new ColumnHeader();
-            fileTransferNameCol.Text = "Filename";
-            fileTransferNameCol.Width = 212;
-            ColumnHeader fileTransferProgressCol = new ColumnHeader();
-            fileTransferProgressCol.Text = "%";
-            fileTransferProgressCol.TextAlign = HorizontalAlignment.Right;
-            fileTransferProgressCol.Width = 40;
+            // TODO: create columns
 
-            // create list view
-            ListView fileTransferLV = new ListView();
-            fileTransferLV.Anchor = (AnchorStyles)(((AnchorStyles.Top | AnchorStyles.Left) | AnchorStyles.Right));
-            fileTransferLV.Columns.AddRange(new ColumnHeader[] {
-                fileTransferIDCol, fileTransferNameCol, fileTransferProgressCol
-            });
-            fileTransferLV.Location = new Point(0, 0);
-            fileTransferLV.Size = new Size(316, 150);
-            fileTransferLV.UseCompatibleStateImageBehavior = false;
-            fileTransferLV.View = View.Details;
+            // TODO: create list view
 
-            // create other controls
-            Button disconnectBtn = new Button();
-            disconnectBtn.Anchor = AnchorStyles.None;
-            disconnectBtn.Location = new Point(121, 162);
-            disconnectBtn.Size = new Size(75, 23);
-            disconnectBtn.Text = "Disconnect";
-            disconnectBtn.UseVisualStyleBackColor = true;
+            // TODO: create send text controls
 
-            // create tab page
+            // TODO: create send file controls
+
             TabPage newTabPage = new TabPage(serverName);
-            newTabPage.Location = new Point(4, 22);
-            newTabPage.Padding = new Padding(3);
-            newTabPage.Size = new Size(316, 193);
-            newTabPage.UseVisualStyleBackColor = true;
-            newTabPage.Controls.Add(fileTransferLV);
-            newTabPage.Controls.Add(disconnectBtn);
+            // TODO: add controls
             this.fileTransferTabs.TabPages.Add(newTabPage);
-        }
-
-        private void updateSendControls()
-        {
-            // TODO: Check for existing connection
-            if (this.fileTransferTabs.TabCount > 0)
-            {
-                this.sendTextTB.Enabled = true;
-                this.sendTextBtn.Enabled = true;
-                this.sendFileTB.Enabled = true;
-                this.browseFileBtn.Enabled = true;
-                this.sendFileBtn.Enabled = true;
-                this.fileTransferTabs.Enabled = true;
-            }
-            else
-            {
-                this.sendTextTB.Enabled = false;
-                this.sendTextBtn.Enabled = false;
-                this.sendFileTB.Enabled = false;
-                this.browseFileBtn.Enabled = false;
-                this.sendFileBtn.Enabled = false;
-                this.fileTransferTabs.Enabled = false;
-            }
         }
 
         internal void print(string message)
@@ -180,6 +95,5 @@ namespace KKClientServer
             rowInfo[1] = message;
             this.logLV.Items.Add(new ListViewItem(rowInfo));
         }
-
     }
 }
