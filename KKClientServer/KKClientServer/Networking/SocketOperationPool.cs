@@ -8,7 +8,8 @@ using System.Threading.Tasks;
 namespace KKClientServer.Networking {
 
     public class SocketOperationPool {
-        #region Fields (SocketOperationPool)       
+        #region Fields (SocketOperationPool)
+        // The data structure to hold all event args     
         Stack<SocketAsyncEventArgs> pool;
         #endregion
 
@@ -31,23 +32,25 @@ namespace KKClientServer.Networking {
         }
 
         /// <summary>
-        /// Adds a socket operation to the pool. 
+        /// Adds event args to the pool. 
         /// </summary>
-        /// <param name="so">The socket operation to add.</param>
-        internal void Push(SocketAsyncEventArgs so) {
-            if (so == null) {
+        /// <param name="saea">The socket operation to add.</param>
+        internal void Push(SocketAsyncEventArgs saea) {
+            if (saea == null) {
                 throw new ArgumentNullException("Socket operation added to the pool must not be null!");
             }
             lock (this.pool) {
-                this.pool.Push(so);
+                // clean and push
+                saea.AcceptSocket = null;
+                this.pool.Push(saea);
             }
         }
 
         /// <summary>
-        /// Removes a socket operation from the pool.
+        /// Removes event args from the pool.
         /// </summary>
         /// <returns>
-        /// The removed socket operation.
+        /// The removed event args.
         /// </returns>   
         internal SocketAsyncEventArgs Pop() {
             lock (this.pool) {

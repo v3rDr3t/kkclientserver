@@ -28,6 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
+            this.components = new System.ComponentModel.Container();
             this.clientGB = new System.Windows.Forms.GroupBox();
             this.enterIPLabel = new System.Windows.Forms.Label();
             this.selectServerTB = new System.Windows.Forms.TextBox();
@@ -44,6 +45,7 @@
             this.fileTransferTabs = new System.Windows.Forms.TabControl();
             this.browseFileBtn = new System.Windows.Forms.Button();
             this.sendBtn = new System.Windows.Forms.Button();
+            this.toolTip = new System.Windows.Forms.ToolTip(this.components);
             this.clientGB.SuspendLayout();
             this.logGB.SuspendLayout();
             this.connectionsGB.SuspendLayout();
@@ -86,6 +88,7 @@
             this.clientConnectBtn.Name = "clientConnectBtn";
             this.clientConnectBtn.Size = new System.Drawing.Size(24, 24);
             this.clientConnectBtn.TabIndex = 2;
+            this.toolTip.SetToolTip(this.clientConnectBtn, "Connect");
             this.clientConnectBtn.UseVisualStyleBackColor = true;
             this.clientConnectBtn.Click += new System.EventHandler(this.onConnectBtn_Click);
             // 
@@ -93,7 +96,6 @@
             // 
             this.sendFileTB.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.sendFileTB.Enabled = false;
             this.sendFileTB.Location = new System.Drawing.Point(50, 272);
             this.sendFileTB.Name = "sendFileTB";
             this.sendFileTB.Size = new System.Drawing.Size(410, 20);
@@ -103,7 +105,6 @@
             // 
             this.sendTextTB.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.sendTextTB.Enabled = false;
             this.sendTextTB.Location = new System.Drawing.Point(50, 244);
             this.sendTextTB.Name = "sendTextTB";
             this.sendTextTB.Size = new System.Drawing.Size(440, 20);
@@ -201,24 +202,26 @@
             // browseFileBtn
             // 
             this.browseFileBtn.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.browseFileBtn.Enabled = false;
             this.browseFileBtn.Image = global::KKClientServer.Properties.Resources.browse16;
             this.browseFileBtn.Location = new System.Drawing.Point(466, 270);
             this.browseFileBtn.Name = "browseFileBtn";
             this.browseFileBtn.Size = new System.Drawing.Size(24, 24);
             this.browseFileBtn.TabIndex = 9;
+            this.toolTip.SetToolTip(this.browseFileBtn, "Browse");
             this.browseFileBtn.UseVisualStyleBackColor = true;
+            this.browseFileBtn.Click += new System.EventHandler(this.onBrowseFileBtn_Click);
             // 
             // sendBtn
             // 
             this.sendBtn.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.sendBtn.Enabled = false;
             this.sendBtn.Image = global::KKClientServer.Properties.Resources.send32;
             this.sendBtn.Location = new System.Drawing.Point(496, 244);
             this.sendBtn.Name = "sendBtn";
             this.sendBtn.Size = new System.Drawing.Size(50, 50);
             this.sendBtn.TabIndex = 7;
+            this.toolTip.SetToolTip(this.sendBtn, "Send");
             this.sendBtn.UseVisualStyleBackColor = true;
+            this.sendBtn.Click += new System.EventHandler(this.onSendBtn_Click);
             // 
             // MainView
             // 
@@ -257,6 +260,7 @@
         private System.Windows.Forms.GroupBox connectionsGB;
         private System.Windows.Forms.TabControl fileTransferTabs;
         private System.Windows.Forms.Label enterIPLabel;
+        private System.Windows.Forms.ToolTip toolTip;
     }
 }
 

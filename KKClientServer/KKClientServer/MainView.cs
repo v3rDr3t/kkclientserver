@@ -1,15 +1,8 @@
 ﻿using KKClientServer.Client;
+using KKClientServer.Networking;
 using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Drawing;
 using System.IO;
-using System.Linq;
-using System.Net;
-using System.Net.Sockets;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace KKClientServer {
@@ -17,21 +10,28 @@ namespace KKClientServer {
     public partial class MainView : Form {
         #region Fields
         private Controller controller;
-        private int tabId = 1;
         #endregion
 
+        /// <summary>
+        /// Constructs a <see cref="MainView"/> object.
+        /// </summary>
         public MainView() {
             InitializeComponent();
         }
 
         /// <summary>
-        /// Adds the given <see cref="Controller"/> to the main view.
+        /// Adds the given controller to the main view.
         /// </summary>
         /// <param name="controller">The controller.</param>
         internal void AddController(Controller controller) {
             this.controller = controller;
         }
 
+        /// <summary>
+        /// Callback for main view closing.
+        /// </summary>
+        /// <param name="sender">The sender.</param>
+        /// <param name="e">The event.</param>
         private void onMainView_Closing(object sender, FormClosingEventArgs e) {
             // TODO: stop TCP listener
             Print("Stopping server...");
@@ -39,54 +39,82 @@ namespace KKClientServer {
             // TODO: misc cleanup
         }
 
+        /// <summary>
+        /// Callback for 'Connect' button clicked.
+        /// Initiates connection to a specified host.
+        /// </summary>
+        /// <param name="sender">The sender.</param>
+        /// <param name="e">The event.</param>
         private void onConnectBtn_Click(object sender, EventArgs e) {
             string serverAddress = this.selectServerTB.Text;
-            bool validInput = true;
-            if (validInput /* TODO: Input validation */) {
-                //serverAddress = "192.168.13." + tabId; // TEST
-                Print("Connecting to \"" + serverAddress + "\"...");
-                controller.ConnectTo(serverAddress);
-                //AddConnectionTab(serverAddress, "Host" + (tabId++)); // TEST
-            } else {
-                Print("Invalid server address (" + serverAddress + ").");
-            }
+            Print("Connecting to \"" + serverAddress + "\"...");
+            controller.ConnectTo(serverAddress);
         }
 
-        private void onSendTextBtn_Click(object sender, EventArgs e) {
-            if (!this.sendTextTB.Text.Equals("")) {
-                // TODO: Send text message
-                Print("Initiate sending text \"" + this.sendTextTB.Text + "\"...");
-            }
-        }
-
+        /// <summary>
+        /// Callback for 'Browse' button clicked.
+        /// Initiates file selection.
+        /// </summary>
+        /// <param name="sender">The sender.</param>
+        /// <param name="e">The event.</param>
         private void onBrowseFileBtn_Click(object sender, EventArgs e) {
             using (OpenFileDialog fileBrowser = new OpenFileDialog()) {
                 fileBrowser.Filter = "All Files (*.*)|*.*";
-                if (fileBrowser.ShowDialog() == System.Windows.Forms.DialogResult.OK) {
+                if (fileBrowser.ShowDialog() == DialogResult.OK) {
                     this.sendFileTB.Text = fileBrowser.FileName;
                 }
             }
         }
 
-        private void onSendFileBtn_Click(object sender, EventArgs e) {
-            if (File.Exists(this.sendFileTB.Text)) {
-                // TODO: Send file
-                Print("Initiate sending file \"" + this.sendFileTB.Text + "\"...");
+        /// <summary>
+        /// Callback for 'Send' button clicked.
+        /// Initiates message or file transfer to a specified (connected) host.
+        /// </summary>
+        /// <param name="sender">The sender.</param>
+        /// <param name="e">The event.</param>
+        private void onSendBtn_Click(object sender, EventArgs e) {
+            string hostAddress = this.fileTransferTabs.SelectedTab.Name;
+            if (!this.sendTextTB.Text.Equals("")) {
+                Print("Initiate sending text \"" + this.sendTextTB.Text + "\"...");
+                controller.SendMessageTo(hostAddress, this.sendTextTB.Text);
             }
+            if (File.Exists(this.sendFileTB.Text)) {
+                FileInfo fileInfo = new FileInfo(this.sendFileTB.Text);
+                if (fileInfo.Length > int.MaxValue - Constants.MSG_PREFIX_LENGTH) {
+                    Print("Initiate sending file \"" + this.sendFileTB.Text + "\"...");
+                    controller.SendFileTo(hostAddress, fileInfo);
+                } else {
+                    Print("File \"" + this.sendFileTB.Text + "\" mustn't be bigger than "
+                        + (int.MaxValue - Constants.MSG_PREFIX_LENGTH));
+                }
+            } else {
+                Print("File \"" + this.sendFileTB.Text + "\" does not exist");
+            }
+            this.sendTextTB.Clear();
+            this.sendFileTB.Clear();
         }
 
-        internal void AddConnectionTab(string ip, string hostName) {
-            TabPage newTabPage = createConnectionTab(ip, hostName);
+        /// <summary>
+        /// Adds a new connection tab to the main view.
+        /// </summary>
+        /// <param name="ip">The host ip address.</param>
+        internal void AddConnectionTab(string ip) {
+            TabPage newTabPage = createConnectionTab(ip);
+            // handle main view modification from another thread
             if (this.fileTransferTabs.InvokeRequired) {
                 AddTab_Callback callback = new AddTab_Callback(AddConnectionTab);
-                this.Invoke(callback, new object[] { ip, hostName });
+                this.Invoke(callback, new object[] { ip });
             } else {
                 this.fileTransferTabs.TabPages.Add(newTabPage);
-                Print("Connected to \"" + hostName + "\" (" + ip + ").");
+                Print("Connected to \"" + ip + "\".");
             }
         }
 
-        private TabPage createConnectionTab(string id, string text) {
+        /// <summary>
+        /// Creates a new connection tab.
+        /// </summary>
+        /// <param name="id">The identifier for all controls.</param>
+        private TabPage createConnectionTab(string id) {
             // create new tab
             TabPage tabPage = new TabPage();
             tabPage.Location = new Point(4, 24);
@@ -94,7 +122,7 @@ namespace KKClientServer {
             tabPage.Padding = new Padding(3);
             tabPage.Size = new Size(523, 186);
             tabPage.TabIndex = 0;
-            tabPage.Text = text;
+            tabPage.Text = id;
             tabPage.UseVisualStyleBackColor = true;
 
             // create tool strip button control
@@ -167,37 +195,57 @@ namespace KKClientServer {
             return tabPage;
         }
 
+        /// <summary>
+        /// Callback for 'Disconnect' button clicked.
+        /// Initiates disconnection from host.
+        /// </summary>
+        /// <param name="sender">The sender.</param>
+        /// <param name="e">The event.</param>
         private void disconnectBtn_Click(Object sender, EventArgs e) {
             string hostAddress = ((ToolStripButton)sender).Name;
             Print("Disconnecting from \"" + hostAddress + "\".");
             controller.DisconnectFrom(hostAddress);
         }
 
+        /// <summary>
+        /// Callback for 'Clear' button clicked.
+        /// Removes all finished uploads from respective control.
+        /// </summary>
+        /// <param name="sender">The sender.</param>
+        /// <param name="e">The event.</param>
         private void clearBtn_Click(Object sender, EventArgs e) {
             string origin = ((ToolStripButton)sender).Name;
             Print("Clearing finished uploads to \"" + origin + "\"...");
             // TODO
         }
 
-
+        /// <summary>
+        /// Removes a connection tab in the main view.
+        /// </summary>
+        /// <param name="ip">The host ip address.</param>
         internal void RemoveConnectionTab(string ip) {
             TabPage tabPage = this.fileTransferTabs.TabPages[ip];
+            // handle main view modification from another thread
             if (this.fileTransferTabs.InvokeRequired) {
                 RemoveTab_Callback callback = new RemoveTab_Callback(RemoveConnectionTab);
                 this.Invoke(callback, new object[] { ip });
             } else {
                 if (tabPage != null) {
                     this.fileTransferTabs.TabPages.Remove(tabPage);
-                    Print("Disconnected from \"Name\" (" + ip + ").");
+                    Print("Disconnected from \"" + ip + "\".");
                 }
             }
         }
-    
+
+        /// <summary>
+        /// Prints logging informatin to the log control.
+        /// </summary>
+        /// <param name="msg">The logging information.</param>
         internal void Print(string msg) {
             string[] rowInfo = new string[2];
             rowInfo[0] = DateTime.Now.ToString(Constants.LOG_DATETIME_FORMAT);
             rowInfo[1] = msg;
-
+            // handle main view modification from another thread
             if (this.logLV.InvokeRequired) {
                 Print_Callback callback = new Print_Callback(Print);
                 this.Invoke(callback, new object[] { msg });
@@ -206,8 +254,9 @@ namespace KKClientServer {
             }
         }
 
+        // delegates for access from another thread
         delegate void Print_Callback(string msg);
-        delegate void AddTab_Callback(string ip, string hostName);
+        delegate void AddTab_Callback(string ip);
         delegate void RemoveTab_Callback(string ip);
     }
 }
