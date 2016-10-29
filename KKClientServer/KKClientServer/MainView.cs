@@ -80,12 +80,12 @@ namespace KKClientServer {
             }
             if (File.Exists(this.sendFileTB.Text)) {
                 FileInfo fileInfo = new FileInfo(this.sendFileTB.Text);
-                if (fileInfo.Length > int.MaxValue - Constants.MSG_PREFIX_LENGTH) {
+                if (fileInfo.Length < int.MaxValue - Constants.PREFIX_SIZE) {
                     Print("Initiate sending file \"" + this.sendFileTB.Text + "\"...");
                     controller.SendFileTo(hostAddress, fileInfo);
                 } else {
                     Print("File \"" + this.sendFileTB.Text + "\" mustn't be bigger than "
-                        + (int.MaxValue - Constants.MSG_PREFIX_LENGTH));
+                        + (int.MaxValue - Constants.PREFIX_SIZE));
                 }
             } else {
                 Print("File \"" + this.sendFileTB.Text + "\" does not exist");

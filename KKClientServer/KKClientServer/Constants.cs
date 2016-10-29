@@ -5,22 +5,20 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace KKClientServer {
-    public class Settings {
-
-    }
 
     public class Constants {
-        // default network settings
+        // default port
         public const int DEFAULT_PORT = 51010;
 
         // maximum number of connections for send/receive
         public const int MAX_NUM_CONNECTIONS = 100;
 
-        // maximum number of connections for send/receive
-        public const int MAX_NUM_SEND_REC = 500;
-
         // size of the data buffer.
         public const int BUFFER_SIZE = 512;
+
+        // maximum number of asynchronous send/receive operations that can be
+        // posted simultaneously
+        public const int MAX_ASYNC_SEND_REC_OPS = 500;
 
         // maximum number of asynchronous accept operations that can be
         // posted simultaneously
@@ -35,9 +33,15 @@ namespace KKClientServer {
 
         // size of the queue for incoming connections
         public const int BACKLOG = 100;
-
-        // size of the message prefixes
-        public const int MSG_PREFIX_LENGTH = 5;
+        
+        // size of the tcp message prefix
+        public const int PREFIX_SIZE = 13;
+        // size of the length prefix
+        public const int LENGTH_PREFIX_SIZE = 4;
+        // offset for text length prefix
+        public const int TEXT_LENGTH_PREFIX_OFFSET = 1;
+        // offset for file length prefix
+        public const int FILE_LENGTH_PREFIX_OFFSET = 5;
 
         // logging
         public const string LOG_DATETIME_FORMAT = "HH:mm:ss (dd-MM-yyyy)";

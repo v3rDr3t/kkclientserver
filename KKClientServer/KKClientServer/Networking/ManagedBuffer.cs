@@ -12,9 +12,9 @@ namespace KKClientServer.Networking {
     /// </summary>
     public class ManagedBuffer {
         #region Fields
-        // total number of bytes
+        // The total number of bytes
         private int bytesTotal;
-        // byte array.
+        // The global byte array.
         private byte[] buffer;
 
         private int bytesAllocated;

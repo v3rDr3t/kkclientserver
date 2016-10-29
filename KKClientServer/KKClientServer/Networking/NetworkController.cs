@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System;
 using KKClientServer.Networking.Client;
 using System.IO;
+using System.Text;
 
 namespace KKClientServer.Networking {
     internal class NetworkController {
@@ -26,7 +27,9 @@ namespace KKClientServer.Networking {
         // The builder for tcp messages
         private TcpMessageBuilder messageBuilder;
         // The receive message handler
-        private ReceiveMessageHandler messageHandler;
+        private ReceiveMessageHandler receiveHandler;
+        // The send message handler
+        private SendMessageHandler sendHandler;
         #endregion
 
         /// <summary>
@@ -44,9 +47,10 @@ namespace KKClientServer.Networking {
             this.connections = new Dictionary<IPEndPoint, SocketAsyncEventArgs>();
             this.connectEventArgsPool = new SocketOperationPool(Constants.MAX_ASYNC_CONNECT_OPS);
             this.acceptEventArgsPool = new SocketOperationPool(Constants.MAX_ASYNC_ACCEPT_OPS);
-            this.sendRecEventArgsPool = new SocketOperationPool(Constants.MAX_NUM_SEND_REC);
+            this.sendRecEventArgsPool = new SocketOperationPool(Constants.MAX_ASYNC_SEND_REC_OPS);
             this.messageBuilder = new TcpMessageBuilder();
-            this.messageHandler = new ReceiveMessageHandler();
+            this.receiveHandler = new ReceiveMessageHandler();
+            this.sendHandler = new SendMessageHandler();
 
             initializePools();
             startListening();
@@ -65,9 +69,9 @@ namespace KKClientServer.Networking {
                 sendRecEA = new SocketAsyncEventArgs();
                 sendRecEA.Completed += new EventHandler<SocketAsyncEventArgs>(onSendRec_Completed);
                 this.buffer.Set(sendRecEA);
-
-                DataUserToken receiveSendToken = new DataUserToken(sendRecEA);
-                sendRecEA.UserToken = receiveSendToken;
+                // assign transfer data object
+                TransferData token = new TransferData(sendRecEA);
+                sendRecEA.UserToken = token;
 
                 this.sendRecEventArgsPool.Push(sendRecEA);
             }
@@ -77,9 +81,9 @@ namespace KKClientServer.Networking {
         /// Starts listening for connection requests.
         /// </summary>
         private void startListening() {
-            IPEndPoint localEndPoint = new IPEndPoint(IPAddress.Any, Constants.DEFAULT_PORT);
-            serverSocket = new Socket(localEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-            serverSocket.Bind(localEndPoint);
+            IPEndPoint localEP = new IPEndPoint(IPAddress.Any, Constants.DEFAULT_PORT);
+            serverSocket = new Socket(localEP.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            serverSocket.Bind(localEP);
 
             // start listener
             serverSocket.Listen(Constants.BACKLOG);
@@ -120,9 +124,9 @@ namespace KKClientServer.Networking {
             }
             // continue accepting.
             startAccepting();
-            // add to current client connections
-            IPEndPoint client = acceptEA.AcceptSocket.RemoteEndPoint as IPEndPoint;
+
             // report back
+            IPEndPoint client = acceptEA.AcceptSocket.RemoteEndPoint as IPEndPoint;
             controller.Print("\"" + client.Address + "\" connected.");
 
             // start receiving for accepted client connection
@@ -137,8 +141,8 @@ namespace KKClientServer.Networking {
         /// </summary>
         /// <param name="sender">The sender.</param>
         /// <param name="saea">The accept event args.</param>
-        private void onAccept_Completed(object sender, SocketAsyncEventArgs op) {
-            processAccept(op);
+        private void onAccept_Completed(object sender, SocketAsyncEventArgs saea) {
+            processAccept(saea);
         }
 
         /// <summary>
@@ -147,7 +151,7 @@ namespace KKClientServer.Networking {
         /// <param name="receiveEA">The receive event args.</param>
         private void startReceiving(SocketAsyncEventArgs receiveEA) {
             // set the buffer
-            DataUserToken token = (DataUserToken)receiveEA.UserToken;
+            TransferData token = (TransferData)receiveEA.UserToken;
             receiveEA.SetBuffer(token.ReceiveBufferOffset, Constants.BUFFER_SIZE);
 
             // post receive operation
@@ -162,7 +166,7 @@ namespace KKClientServer.Networking {
         /// </summary>
         /// <param name="receiveEA">The receive event args.</param>
         private void processReceive(SocketAsyncEventArgs receiveEA) {
-            DataUserToken token = (DataUserToken)receiveEA.UserToken;
+            TransferData token = (TransferData)receiveEA.UserToken;
             // close connection on socket error
             if (receiveEA.SocketError != SocketError.Success) {
                 token.Reset();
@@ -188,8 +192,9 @@ namespace KKClientServer.Networking {
 
             // handle the prefix
             int bytesToProcess = receiveEA.BytesTransferred;
-            if (token.PrefixBytesReceived < Constants.MSG_PREFIX_LENGTH) {
-                bytesToProcess = messageHandler.HandlePrefix(receiveEA, token, bytesToProcess);
+            Console.WriteLine("Receive> Received " + bytesToProcess + " bytes.");
+            if (token.PrefixBytesReceived < Constants.PREFIX_SIZE) {
+                bytesToProcess = receiveHandler.HandlePrefix(receiveEA, token, bytesToProcess);
                 // post another receive operation in case prefix is incomplete
                 if (bytesToProcess == 0) {
                     startReceiving(receiveEA);
@@ -198,13 +203,16 @@ namespace KKClientServer.Networking {
             }
 
             // handle the message content
-            bool msgComplete = messageHandler.HandleMessage(receiveEA, token, bytesToProcess);
+            bool msgComplete = receiveHandler.HandleMessage(receiveEA, token, bytesToProcess);
             if (msgComplete) {
                 // handle received data                      
-                string text = token.DataHandler.HandleTextData(receiveEA);
+                string text = token.DataHandler.HandleData(receiveEA);
                 // report back
                 IPEndPoint client = receiveEA.AcceptSocket.RemoteEndPoint as IPEndPoint;
-                controller.Print(client.Address + ": \"" + text + "\"");
+                if (token.Type == MessageType.File)
+                    controller.Print(client.Address + ": File \"" + text + "\"");
+                else
+                    controller.Print(client.Address + ": Text \"" + text + "\"");
                 token.Reset();
             } else {
                 token.MessageOffset = token.ReceiveBufferOffset;
@@ -219,10 +227,11 @@ namespace KKClientServer.Networking {
         /// <param name="ip">The host ip.</param>
         public void ConnectTo(string ip) {
             IPAddress address = IPAddress.Parse(ip);
-            IPEndPoint endPoint = new IPEndPoint(address, Constants.DEFAULT_PORT);
+            IPEndPoint remoteEP = new IPEndPoint(address, Constants.DEFAULT_PORT);
+
             // try to connect
-            SocketAsyncEventArgs connectOp = getConnectEventArgs(endPoint);
-            if (!this.connections.ContainsKey(endPoint)) {
+            SocketAsyncEventArgs connectOp = getConnectEventArgs(remoteEP);
+            if (!this.connections.ContainsKey(remoteEP)) {
                 startConnecting(connectOp);
             } else {
                 controller.Print("Already connected to host (" + ip + ").");
@@ -232,15 +241,15 @@ namespace KKClientServer.Networking {
         /// <summary>
         /// Gets or creates connect event args for a given endpoint.
         /// </summary>
-        /// <param name="ep">The endpoint.</param>
-        private SocketAsyncEventArgs getConnectEventArgs(IPEndPoint ep) {
+        /// <param name="remoteEP">The remote endpoint.</param>
+        private SocketAsyncEventArgs getConnectEventArgs(IPEndPoint remoteEP) {
             SocketAsyncEventArgs connectEA = this.connectEventArgsPool.Pop();
             if (connectEA == null) {
                 connectEA = new SocketAsyncEventArgs();
                 connectEA.Completed += new EventHandler<SocketAsyncEventArgs>(onConnect_Completed);
             }
             Socket clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            connectEA.RemoteEndPoint = ep;
+            connectEA.RemoteEndPoint = remoteEP;
             connectEA.AcceptSocket = clientSocket;
             return connectEA;
         }
@@ -248,12 +257,12 @@ namespace KKClientServer.Networking {
         /// <summary>
         /// Starts the connection process.
         /// </summary>
-        /// <param name="saea">The connect event args.</param>
-        private void startConnecting(SocketAsyncEventArgs saea) {
+        /// <param name="connectEA">The connect event args.</param>
+        private void startConnecting(SocketAsyncEventArgs connectEA) {
             // post connect operation on the socket
-            bool pending = saea.AcceptSocket.ConnectAsync(saea);
+            bool pending = connectEA.AcceptSocket.ConnectAsync(connectEA);
             if (!pending) {
-                processConnect(saea);
+                processConnect(connectEA);
             }
         }
 
@@ -273,7 +282,7 @@ namespace KKClientServer.Networking {
                     break;
 
                 default:
-                    throw new ArgumentException("Unknown last operation for connect!");
+                    throw new ArgumentException("Unknown completed operation for connect!");
             }
         }
 
@@ -285,19 +294,19 @@ namespace KKClientServer.Networking {
         private void onSendRec_Completed(object sender, SocketAsyncEventArgs saea) {
             switch (saea.LastOperation) {
                 case SocketAsyncOperation.Send:
-                    processSend(saea);
+                    TransferData token = (TransferData)saea.UserToken;
+                    if (token.Type == MessageType.Text)
+                        processSendText(saea);
+                    else
+                        processSendFile(saea);
                     break;
 
                 case SocketAsyncOperation.Receive:
                     processReceive(saea);
                     break;
 
-                case SocketAsyncOperation.Disconnect:
-                    // TODO: ...
-                    break;
-
                 default:
-                    throw new ArgumentException("Unknown last operation for send/receive!");
+                    throw new ArgumentException("Unknown completed operation for send/receive!");
             }
         }
 
@@ -307,10 +316,10 @@ namespace KKClientServer.Networking {
         /// <param name="saea">The event args.</param>
         private void processConnect(SocketAsyncEventArgs saea) {
             if (saea.SocketError == SocketError.Success) {
-                IPEndPoint host = saea.RemoteEndPoint as IPEndPoint;
-                this.connections.Add(host, saea);
+                IPEndPoint remoteEP = saea.RemoteEndPoint as IPEndPoint;
+                this.connections.Add(remoteEP, saea);
                 // visualize
-                controller.Connected(host.Address.ToString());
+                controller.Connected(remoteEP.Address.ToString());
             } else {
                 processConnectionError(saea);
             }
@@ -324,11 +333,11 @@ namespace KKClientServer.Networking {
             // close socket
             closeSocket(saea.AcceptSocket);
             // release all resources
-            IPEndPoint host = saea.RemoteEndPoint as IPEndPoint;
-            this.connections.Remove(host);
+            IPEndPoint remoteEP = saea.RemoteEndPoint as IPEndPoint;
+            this.connections.Remove(remoteEP);
             this.connectEventArgsPool.Push(saea);
             // report back
-            controller.Print("Could not connect to host (" + host.Address.ToString() + ").");
+            controller.Print("Could not connect to host (" + remoteEP.Address.ToString() + ").");
         }
 
         /// <summary>
@@ -347,12 +356,12 @@ namespace KKClientServer.Networking {
         /// <summary>
         /// Disconnects from a host.
         /// </summary>
-        /// <param name="hostAddress">The host address.</param>
-        public void DisconnectFrom(string hostAddress) {
-            IPAddress ip = IPAddress.Parse(hostAddress);
-            IPEndPoint endPoint = new IPEndPoint(ip, Constants.DEFAULT_PORT);
+        /// <param name="ip">The ip address.</param>
+        public void DisconnectFrom(string ip) {
+            IPAddress address = IPAddress.Parse(ip);
+            IPEndPoint remoteEP = new IPEndPoint(address, Constants.DEFAULT_PORT);
             // try to disconnect
-            startDisconnecting(this.connections[endPoint]);
+            startDisconnecting(this.connections[remoteEP]);
         }
 
         /// <summary>
@@ -360,7 +369,7 @@ namespace KKClientServer.Networking {
         /// </summary>
         /// <param name="saea">The event args.</param>
         private void startDisconnecting(SocketAsyncEventArgs saea) {
-            saea.AcceptSocket.Shutdown(SocketShutdown.Both);
+            //saea.AcceptSocket.Shutdown(SocketShutdown.Both);
             bool pending = saea.AcceptSocket.DisconnectAsync(saea);
             if (!pending) {
                 processDisconnect(saea);
@@ -373,94 +382,98 @@ namespace KKClientServer.Networking {
         /// <param name="saea">The event args.</param>
         private void processDisconnect(SocketAsyncEventArgs saea) {
             // close socket
-            saea.AcceptSocket.Close();
+            closeSocket(saea.AcceptSocket);
             // release all resources
-            IPEndPoint host = saea.RemoteEndPoint as IPEndPoint;
-            string hostAddress = host.Address.ToString();
-            this.connections.Remove(host);
+            IPEndPoint remoteEP = saea.RemoteEndPoint as IPEndPoint;
+            string address = remoteEP.Address.ToString();
+            this.connections.Remove(remoteEP);
             this.connectEventArgsPool.Push(saea);
             // visualize
-            controller.Disconnected(hostAddress);
+            controller.Disconnected(address);
         }
 
         /// <summary>
         /// Sends a text message to a connected host.
         /// </summary>
-        /// <param name="ip">The host ip.</param>
-        /// <param name="msg">The text message to send.</param>
-        internal void SendMessageTo(string ip, string msg) {
+        /// <param name="ip">The ip address.</param>
+        /// <param name="text">The text message to send.</param>
+        internal void SendTextTo(string ip, string text) {
             IPAddress address = IPAddress.Parse(ip);
-            IPEndPoint endPoint = new IPEndPoint(address, Constants.DEFAULT_PORT);
+            IPEndPoint remoteEP = new IPEndPoint(address, Constants.DEFAULT_PORT);
 
-            // try to send
-            if (this.connections.ContainsKey(endPoint)) {
-                SocketAsyncEventArgs sendRecEA = getSendReceiveEventArgs(endPoint);
+            // try to send text message
+            if (this.connections.ContainsKey(remoteEP)) {
+                SocketAsyncEventArgs sendEA = getSendReceiveEventArgs(remoteEP);
                 // assign socket from current connections
-                sendRecEA.AcceptSocket = this.connections[endPoint].AcceptSocket;
+                sendEA.AcceptSocket = this.connections[remoteEP].AcceptSocket;
                 // build tcp message
-                this.messageBuilder.BuildTextData(msg, sendRecEA);
-                startSending(sendRecEA);
+                this.messageBuilder.BuildTextData(text, sendEA);
+                startSendingText(sendEA);
             } else {
                 throw new ArgumentException("Cannot send text message to unconnected host \""
-                    + endPoint.Address.ToString() + "\"!");
+                    + remoteEP.Address.ToString() + "\"!");
             }
         }
 
         /// <summary>
-        /// Gets or creates send/receive event args for a given endpoint.
+        /// Gets or creates send/receive event args for a given remote endpoint.
         /// </summary>
-        /// <param name="ep">The endpoint.</param>
-        private SocketAsyncEventArgs getSendReceiveEventArgs(IPEndPoint ep) {
+        /// <param name="remoteEP">The remote endpoint.</param>
+        private SocketAsyncEventArgs getSendReceiveEventArgs(IPEndPoint remoteEP) {
             SocketAsyncEventArgs sendRecEA = this.sendRecEventArgsPool.Pop();
             if (sendRecEA == null) {
                 sendRecEA = new SocketAsyncEventArgs();
                 sendRecEA.Completed += new EventHandler<SocketAsyncEventArgs>(onSendRec_Completed);
-                DataUserToken receiveSendToken = new DataUserToken(sendRecEA);
-                sendRecEA.UserToken = receiveSendToken;
+                // assign transfer data object
+                TransferData token = new TransferData(sendRecEA);
+                sendRecEA.UserToken = token;
             }
-            sendRecEA.RemoteEndPoint = ep;
+            sendRecEA.RemoteEndPoint = remoteEP;
             return sendRecEA;
         }
 
         /// <summary>
-        /// Starts the (text) sending process.
+        /// Starts the sending process for text.
         /// </summary>
-        /// <param name="sendRecEA">The send/receive event args.</param>
-        private void startSending(SocketAsyncEventArgs sendRecEA) {
-            DataUserToken token = (DataUserToken)sendRecEA.UserToken;
+        /// <param name="sendEA">The send event args.</param>
+        private void startSendingText(SocketAsyncEventArgs sendEA) {
+            TransferData token = (TransferData)sendEA.UserToken;
+            // message fits into buffer
             if (token.RemainingBytesToSend <= Constants.BUFFER_SIZE) {
-                // data fits into buffer
-                sendRecEA.SetBuffer(token.SendBufferOffset, token.RemainingBytesToSend);
-                //Copy the bytes to the buffer associated with the event args.
-                Buffer.BlockCopy(token.SendData, token.BytesSent,
-                    sendRecEA.Buffer, token.SendBufferOffset, token.RemainingBytesToSend);
-            } else {
-                // data doesn't fit into buffer so send as much as possible
-                sendRecEA.SetBuffer(token.SendBufferOffset, Constants.BUFFER_SIZE);
-                // copy bytes to the buffer associated with the event args.
-                Buffer.BlockCopy(token.SendData, token.BytesSent,
-                    sendRecEA.Buffer, token.SendBufferOffset, Constants.BUFFER_SIZE);
+                sendEA.SetBuffer(token.SendBufferOffset, (int)token.RemainingBytesToSend);
+                Buffer.BlockCopy(
+                    token.TextData, (int)token.BytesSent,
+                    sendEA.Buffer, token.SendBufferOffset,
+                    (int)token.RemainingBytesToSend);
+            }
+            // message doesn't fit into buffer (send as much as possible)
+            else {
+                sendEA.SetBuffer(token.SendBufferOffset, Constants.BUFFER_SIZE);
+                Buffer.BlockCopy(
+                    token.TextData, (int)token.BytesSent,
+                    sendEA.Buffer, token.SendBufferOffset,
+                    Constants.BUFFER_SIZE);
             }
 
             // post the send operation
-            bool pending = sendRecEA.AcceptSocket.SendAsync(sendRecEA);
+            bool pending = sendEA.AcceptSocket.SendAsync(sendEA);
             if (!pending) {
-                processSend(sendRecEA);
+                processSendText(sendEA);
             }
         }
 
         /// <summary>
-        /// Processes a send operation of given event args.
+        /// Processes a file sending operation.
         /// </summary>
-        /// <param name="sendEA">The event args.</param>
-        private void processSend(SocketAsyncEventArgs sendEA) {
-            DataUserToken token = (DataUserToken)sendEA.UserToken;
+        /// <param name="sendEA">The send event args.</param>
+        private void processSendText(SocketAsyncEventArgs sendEA) {
+            TransferData token = (TransferData)sendEA.UserToken;
             if (sendEA.SocketError == SocketError.Success) {
-                token.RemainingBytesToSend -= sendEA.BytesTransferred;
+                token.RemainingBytesToSend -= (ulong)sendEA.BytesTransferred;
                 if (token.RemainingBytesToSend != 0) {
                     // not all data has been successfully transfered yet
-                    token.BytesSent += sendEA.BytesTransferred;
-                    startSending(sendEA);
+                    token.BytesSent += (ulong)sendEA.BytesTransferred;
+                    startSendingText(sendEA);
                 } else {
                     this.sendRecEventArgsPool.Push(sendEA);
                     //report back
@@ -480,60 +493,63 @@ namespace KKClientServer.Networking {
         /// <param name="fileInfo">The file information.</param>
         internal void SendFileTo(string ip, FileInfo fileInfo) {
             IPAddress address = IPAddress.Parse(ip);
-            IPEndPoint endPoint = new IPEndPoint(address, Constants.DEFAULT_PORT);
+            IPEndPoint remoteEP = new IPEndPoint(address, Constants.DEFAULT_PORT);
             // try to send
-            if (this.connections.ContainsKey(endPoint)) {
-                SocketAsyncEventArgs sendRecEA = getSendReceiveEventArgs(endPoint);
+            if (this.connections.ContainsKey(remoteEP)) {
+                SocketAsyncEventArgs sendRecEA = getSendReceiveEventArgs(remoteEP);
                 // assign socket from current connections
-                sendRecEA.AcceptSocket = this.connections[endPoint].AcceptSocket;
+                sendRecEA.AcceptSocket = this.connections[remoteEP].AcceptSocket;
                 // build tcp message
                 this.messageBuilder.BuildFileInfoData(fileInfo, sendRecEA);
                 startSendingFile(sendRecEA);
             } else {
                 throw new ArgumentException("Cannot send file to unconnected host \""
-                    + endPoint.Address.ToString() + "\"!");
+                    + remoteEP.Address.ToString() + "\"!");
             }
         }
 
         /// <summary>
-        /// Starts the (file) sending process.
+        /// Starts the sending process of a file.
         /// </summary>
-        /// <param name="sendRecEA">The send/receive event args.</param>
-        private void startSendingFile(SocketAsyncEventArgs sendRecEA) {
-            DataUserToken token = (DataUserToken)sendRecEA.UserToken;
-
-            // transfer whole message
+        /// <param name="sendEA">The send/receive event args.</param>
+        private void startSendingFile(SocketAsyncEventArgs sendEA) {
+            TransferData token = (TransferData)sendEA.UserToken;
+            // message fits into buffer
             if (token.RemainingBytesToSend <= Constants.BUFFER_SIZE) {
-                Console.WriteLine("prefix+file fit into buffer.");
+                sendEA.SetBuffer(token.SendBufferOffset, (int)token.RemainingBytesToSend);
             }
-            // transfer message blockwise
+            // message doesn't fit into buffer (send as much as possible)
             else {
-                // transfer whole prefix
-                if (Constants.MSG_PREFIX_LENGTH <= Constants.BUFFER_SIZE) {
-                    Console.WriteLine("prefix fits into buffer.");
-                }
-                // transfer prefix blockwise
-                else {
-                    Console.WriteLine("prefix does not fit into buffer.");
-                }
+                sendEA.SetBuffer(token.SendBufferOffset, Constants.BUFFER_SIZE);
             }
+            // handle prefix
+            int fileDataToProcess = sendHandler.HandlePrefix(sendEA, token);
+            // handle message
+            sendHandler.HandleMessage(sendEA, token, fileDataToProcess);
             
             // post the send operation
-            bool pending = sendRecEA.AcceptSocket.SendAsync(sendRecEA);
+            bool pending = sendEA.AcceptSocket.SendAsync(sendEA);
             if (!pending) {
-                processFileSend(sendRecEA);
+                processSendFile(sendEA);
             }
         }
 
-        private void processFileSend(SocketAsyncEventArgs sendEA) {
-            DataUserToken token = (DataUserToken)sendEA.UserToken;
+        /// <summary>
+        /// Processes a file sending operation.
+        /// </summary>
+        /// <param name="sendEA">The send event args.</param>
+        private void processSendFile(SocketAsyncEventArgs sendEA) {
+            TransferData token = (TransferData)sendEA.UserToken;
             if (sendEA.SocketError == SocketError.Success) {
-                token.RemainingBytesToSend -= sendEA.BytesTransferred;
-                if (token.RemainingBytesToSend != 0) {
+                token.RemainingBytesToSend -= (ulong)sendEA.BytesTransferred;
+                if (token.RemainingBytesToSend > 0) {
                     // not the whole message has been successfully transfered yet
-                    token.BytesSent += sendEA.BytesTransferred;
-                    startSending(sendEA);
+                    token.BytesSent += (ulong)sendEA.BytesTransferred;
+                    int prefixBytesToSend = token.PrefixBytesToSend - sendEA.BytesTransferred;
+                    token.PrefixBytesToSend = (prefixBytesToSend > 0) ? prefixBytesToSend : 0;
+                    startSendingFile(sendEA);
                 } else {
+                    token.Reset();
                     this.sendRecEventArgsPool.Push(sendEA);
                     //report back
                     controller.Print("File transfer complete.");

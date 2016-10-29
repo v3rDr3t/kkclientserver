@@ -62,7 +62,7 @@ namespace KKClientServer {
         /// <param name="ip">The host address to send to.</param>
         /// <param name="msg">The text message to send.</param>
         internal void SendMessageTo(string ip, string msg) {
-            this.netController.SendMessageTo(ip, msg);
+            this.netController.SendTextTo(ip, msg);
         }
 
         /// <summary>

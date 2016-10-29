@@ -19,21 +19,31 @@ namespace KKClientServer.Client {
         /// <param name="text">The text message.</param>
         /// <param name="saea">The event args.</param>
         internal void BuildTextData(string text, SocketAsyncEventArgs saea) {
-            DataUserToken token = (DataUserToken)saea.UserToken;
+            TransferData token = (TransferData)saea.UserToken;
 
             int textLength = text.Length;
             // convert text message to byte array
             byte[] textAsBytes = Encoding.Default.GetBytes(text);
             // convert message length to byte array
             byte[] lengthAsBytes = BitConverter.GetBytes(textLength);
+
             // serialize
-            token.SendData = new byte[Constants.MSG_PREFIX_LENGTH + textLength];
-            Buffer.SetByte(token.SendData, 0, (byte)MessageType.Text);
-            Buffer.BlockCopy(lengthAsBytes, 0, token.SendData, 1, Constants.MSG_PREFIX_LENGTH - 1);
-            Buffer.BlockCopy(textAsBytes, 0, token.SendData, Constants.MSG_PREFIX_LENGTH, textLength);
+            token.TextData = new byte[Constants.PREFIX_SIZE + textLength];
+            // (type)
+            Buffer.SetByte(token.TextData, 0, (byte)MessageType.Text);
+            // (text length)
+            Buffer.BlockCopy(
+                lengthAsBytes, 0,
+                token.TextData, Constants.TEXT_LENGTH_PREFIX_OFFSET,
+                Constants.LENGTH_PREFIX_SIZE);
+            // (text)
+            Buffer.BlockCopy(
+                textAsBytes, 0,
+                token.TextData, Constants.PREFIX_SIZE,
+                textLength);
 
             // set byte counters
-            token.RemainingBytesToSend = Constants.MSG_PREFIX_LENGTH + textLength;
+            token.RemainingBytesToSend = Convert.ToUInt64(Constants.PREFIX_SIZE + textLength);
             token.BytesSent = 0;
         }
 
@@ -43,23 +53,43 @@ namespace KKClientServer.Client {
         /// <param name="fileInfo">The file information.</param>
         /// <param name="saea">The event args.</param>
         internal void BuildFileInfoData(FileInfo fileInfo, SocketAsyncEventArgs saea) {
-            DataUserToken token = (DataUserToken)saea.UserToken;
+            TransferData token = (TransferData)saea.UserToken;
 
             // get file information
-            int fileLength = (int)fileInfo.Length;
-            // convert file length to byte array
-            byte[] lengthAsBytes = BitConverter.GetBytes(fileLength);
-            // serialize prefix
-            token.SendData = new byte[Constants.MSG_PREFIX_LENGTH];
-            Buffer.SetByte(token.SendData, 0, (byte)MessageType.File);
-            Buffer.BlockCopy(lengthAsBytes, 0, token.SendData, 1, Constants.MSG_PREFIX_LENGTH - 1);
+            int fileNameLength = fileInfo.Name.Length;
+            long fileLength = fileInfo.Length;
+            // convert to byte array
+            byte[] fileNameLengthAsBytes = BitConverter.GetBytes(fileNameLength);
+            byte[] fileLengthAsBytes = BitConverter.GetBytes(fileLength);
+            byte[] fileNameAsBytes = Encoding.Default.GetBytes(fileInfo.Name);
+
+            // serialize
+            token.TextData = new byte[Constants.PREFIX_SIZE + fileNameLength];
+            // (type)
+            Buffer.SetByte(token.TextData, 0, (byte)MessageType.File);
+            // (file name length)
+            Buffer.BlockCopy(
+                fileNameLengthAsBytes, 0,
+                token.TextData, Constants.TEXT_LENGTH_PREFIX_OFFSET,
+                Constants.LENGTH_PREFIX_SIZE);
+            // (file length)
+            Buffer.BlockCopy(
+                fileLengthAsBytes, 0,
+                token.TextData, Constants.FILE_LENGTH_PREFIX_OFFSET,
+                Constants.LENGTH_PREFIX_SIZE * 2);
+            // (file name)
+            Buffer.BlockCopy(
+                fileNameAsBytes, 0,
+                token.TextData, Constants.PREFIX_SIZE,
+                fileNameLength);
 
             // set file stream
-            token.FileStream = new FileStream(fileInfo.Name, FileMode.Open);
+            token.FileStream = new FileStream(fileInfo.FullName, FileMode.Open, FileAccess.Read);
 
             // set byte counters for prefix
-            token.PrefixBytesToSend = Constants.MSG_PREFIX_LENGTH;
-            token.RemainingBytesToSend = Constants.MSG_PREFIX_LENGTH + fileLength;
+            token.PrefixBytesToSend = Constants.PREFIX_SIZE;
+            token.RemainingBytesToSend = Convert.ToUInt64(Constants.PREFIX_SIZE + fileNameLength)
+                + (ulong)fileLength;
             token.BytesSent = 0;
         }
     }
