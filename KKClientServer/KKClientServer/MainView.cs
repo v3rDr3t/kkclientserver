@@ -1,6 +1,4 @@
-﻿using KKClientServer.Client;
-using KKClientServer.Networking;
-using System;
+﻿using System;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
@@ -88,7 +86,9 @@ namespace KKClientServer {
                         + (int.MaxValue - Constants.PREFIX_SIZE));
                 }
             } else {
-                Print("File \"" + this.sendFileTB.Text + "\" does not exist");
+                if (!this.sendFileTB.Text.Equals("")) {
+                    Print("File \"" + this.sendFileTB.Text + "\" does not exist");
+                }
             }
             this.sendTextTB.Clear();
             this.sendFileTB.Clear();

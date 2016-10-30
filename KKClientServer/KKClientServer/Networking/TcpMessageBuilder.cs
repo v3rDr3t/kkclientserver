@@ -1,10 +1,10 @@
-﻿using KKClientServer.Networking.Client;
+﻿using KKClientServer.Networking;
 using System;
 using System.IO;
 using System.Net.Sockets;
 using System.Text;
 
-namespace KKClientServer.Client {
+namespace KKClientServer {
 
     internal enum MessageType : byte {
         Text = 1,
@@ -43,7 +43,7 @@ namespace KKClientServer.Client {
                 textLength);
 
             // set byte counters
-            token.RemainingBytesToSend = Convert.ToUInt64(Constants.PREFIX_SIZE + textLength);
+            token.RemainingBytesToSend = Convert.ToInt64(Constants.PREFIX_SIZE + textLength);
             token.BytesSent = 0;
         }
 
@@ -86,10 +86,10 @@ namespace KKClientServer.Client {
             // set file stream
             token.FileStream = new FileStream(fileInfo.FullName, FileMode.Open, FileAccess.Read);
 
-            // set byte counters for prefix
-            token.PrefixBytesToSend = Constants.PREFIX_SIZE;
-            token.RemainingBytesToSend = Convert.ToUInt64(Constants.PREFIX_SIZE + fileNameLength)
-                + (ulong)fileLength;
+            // set byte counters
+            token.PrefixAndFileNameBytesToSend = Constants.PREFIX_SIZE + fileNameLength;
+            token.RemainingBytesToSend = Convert.ToInt64(Constants.PREFIX_SIZE + fileNameLength)
+                + fileLength;
             token.BytesSent = 0;
         }
     }

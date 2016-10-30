@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace KKClientServer {
+
     internal class Controller {
         #region Fields
         private MainView mainView;

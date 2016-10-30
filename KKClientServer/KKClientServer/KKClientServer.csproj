@@ -58,7 +58,6 @@
     <Compile Include="MainView.Designer.cs">
       <DependentUpon>MainView.cs</DependentUpon>
     </Compile>
-    <Compile Include="Networking\ReceiveDataHandler.cs" />
     <Compile Include="Networking\ReceiveMessageHandler.cs" />
     <Compile Include="Networking\SendMessageHandler.cs" />
     <Compile Include="Networking\TcpMessageBuilder.cs" />

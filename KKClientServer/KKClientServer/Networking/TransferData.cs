@@ -1,9 +1,8 @@
-﻿using KKClientServer.Client;
-using System;
-using System.IO;
+﻿using System.IO;
 using System.Net.Sockets;
+using System.Text;
 
-namespace KKClientServer.Networking.Client {
+namespace KKClientServer.Networking {
 
     internal class TransferData {
         #region Fields
@@ -16,136 +15,174 @@ namespace KKClientServer.Networking.Client {
         private readonly int sendBufferOffset;
 
         // The byte sent counters
-        private ulong remainingBytesToSend;
-        private ulong bytesSent;
-
-        // the buffer offset for the actual message
-        //private readonly int originalMessageOffset;
-        //private int messageOffset;
-        // received bytes counters
-        //private int prefixBytesReceived = 0;
-        //private int messageBytesReceived = 0;
-        //private int prefixBytesProcessed = 0;
-        // message length read from prefix
-        //private int messageLength;
-
-        // The byte array for prefix (receive)
-        //private byte[] prefixData;
-        // The byte array for message (receive)
-        //private byte[] receiveData;
-
-        // receive file ----------------------------------------
-        //private string filePath = "Test.txt";
-        //private BinaryWriter writer;
+        private long remainingBytesToSend;
+        private long bytesSent;
 
         // send file -------------------------------------------
         // The file stream
         private FileStream stream;
         // The remaining prefix bytes to send
-        private int prefixBytesToSend;
+        private int prefixAndFileNameBytesToSend;
 
-        // send text -------------------------------------------
-        // The byte array for message (send)
+        // receive ---------------------------------------------
+        // The prefix byte array
+        private byte[] prefix;
+        // The data byte array
         private byte[] textData;
+        // Received bytes counters
+        private int prefixBytesReceived = 0;
+        private int prefixBytesProcessed = 0;
+        private int textBytesReceived = 0;
+        private int textBytesProcessed = 0;
+        private int fileBytesReceived = 0;
+        // The buffer offset for the data
+        private readonly int originalTextOffset;
+        private int textOffset;
+        private int fileOffset;
+        // The file writer
+        private BinaryWriter writer;
+        // -----------------------------------------------------
+
+        // text length read from prefix
+        private int textLength;
+        private long fileLength;
         #endregion
 
+        /// <summary>
+        /// Constructs a <see cref="TransferData"/> object.
+        /// </summary>
+        /// <param name="saea">The event args.</param>
         public TransferData(SocketAsyncEventArgs saea) {
-            //this.dataHandler = new ReceiveDataHandler();
-
+            // set buffer offset
             this.receiveBufferOffset = saea.Offset;
             this.sendBufferOffset = saea.Offset + Constants.BUFFER_SIZE;
-
-            //this.messageOffset = this.receiveBufferOffset + Constants.MSG_PREFIX_LENGTH;
-            //this.originalMessageOffset = this.messageOffset;
+            // set data offset
+            this.textOffset = this.receiveBufferOffset + Constants.PREFIX_SIZE;
+            this.originalTextOffset = this.textOffset;
         }
 
-        public void Reset() {
-            this.messageOffset = this.originalMessageOffset;
+        /// <summary>
+        /// Gets the received text data as string.
+        /// </summary>
+        /// <param name="saea">The event args.</param>
+        internal string GetReceivedText(SocketAsyncEventArgs saea) {
+            TransferData token = (TransferData)saea.UserToken;
+            return Encoding.Default.GetString(token.TextData);
+        }
+
+        /// <summary>
+        /// Resets the state of the token.
+        /// </summary>
+        internal void Reset() {
             this.prefixBytesReceived = 0;
-            this.messageBytesReceived = 0;
             this.prefixBytesProcessed = 0;
-            this.prefixData = null;
-            this.receiveData = null;
+            this.textBytesReceived = 0;
+            this.textBytesProcessed = 0;
+            this.fileBytesReceived = 0;
+            this.textOffset = this.originalTextOffset;
+
             if (this.stream != null) {
                 this.stream.Close();
                 this.stream = null;
             }
             if (this.writer != null) {
-                Console.WriteLine("Receive> Close writer.");
                 this.writer.Close();
                 this.writer = null;
             }
         }
 
         #region Properties
-        public int ReceiveBufferOffset {
-            get { return this.receiveBufferOffset; }
-        }
-        public int SendBufferOffset {
-            get { return this.sendBufferOffset; }
-        }
-        public int MessageOffset {
-            get { return this.messageOffset; }
-            set { this.messageOffset = value; }
-        }
-        public int PrefixBytesReceived {
-            get { return this.prefixBytesReceived; }
-            set { this.prefixBytesReceived = value; }
-        }
-        public int MessageBytesReceived {
-            get { return this.messageBytesReceived; }
-            set { this.messageBytesReceived = value; }
-        }
-        public int PrefixBytesProcessed {
-            get { return this.prefixBytesProcessed; }
-            set { this.prefixBytesProcessed = value; }
-        }
-        public byte[] TextData {
-            get { return this.textData; }
-            set { this.textData = value; }
-        }
-        public FileStream FileStream {
-            get { return this.stream; }
-            set { this.stream = value; }
-        }
-        public BinaryWriter Writer {
-            get { return this.writer; }
-            set { this.writer = value; }
-        }
-        public string FilePath {
-            get { return this.filePath; }
-            set { this.filePath = value; }
-        }
-        public byte[] PrefixData {
-            get { return this.prefixData; }
-            set { this.prefixData = value; }
-        }
-        public byte[] ReceiveData {
-            get { return this.receiveData; }
-            set { this.receiveData = value; }
-        }
-        public ulong RemainingBytesToSend {
-            get { return this.remainingBytesToSend; }
-            set { this.remainingBytesToSend = value; }
-        }
-        public ulong BytesSent {
-            get { return this.bytesSent; }
-            set { this.bytesSent = value; }
-        }
-        public int MessageLength {
-            get { return this.messageLength; }
-            set { this.messageLength = value; }
-        }
         public MessageType Type {
             get { return this.type; }
             set { this.type = value; }
         }
-        public int PrefixBytesToSend {
-            get { return this.prefixBytesToSend; }
-            set { this.prefixBytesToSend = value; }
+
+        public int ReceiveBufferOffset {
+            get { return this.receiveBufferOffset; }
         }
-        public ReceiveDataHandler DataHandler {
-            get { return this.dataHandler; }
+
+        public int SendBufferOffset {
+            get { return this.sendBufferOffset; }
+        }
+
+        public long RemainingBytesToSend {
+            get { return this.remainingBytesToSend; }
+            set { this.remainingBytesToSend = value; }
+        }
+
+        public long BytesSent {
+            get { return this.bytesSent; }
+            set { this.bytesSent = value; }
+        }
+
+        public byte[] Prefix {
+            get { return this.prefix; }
+            set { this.prefix = value; }
+        }
+
+        public byte[] TextData {
+            get { return this.textData; }
+            set { this.textData = value; }
+        }
+
+        public int TextOffset {
+            get { return this.textOffset; }
+            set { this.textOffset = value; }
+        }
+
+        public int FileOffset {
+            get { return this.fileOffset; }
+            set { this.fileOffset = value; }
+        }
+
+        public int PrefixBytesReceived {
+            get { return this.prefixBytesReceived; }
+            set { this.prefixBytesReceived = value; }
+        }
+
+        public int TextBytesReceived {
+            get { return this.textBytesReceived; }
+            set { this.textBytesReceived = value; }
+        }
+
+        public int FileBytesReceived {
+            get { return this.fileBytesReceived; }
+            set { this.fileBytesReceived= value; }
+        }
+
+        public int PrefixBytesProcessed {
+            get { return this.prefixBytesProcessed; }
+            set { this.prefixBytesProcessed = value; }
+        }
+
+        public int TextBytesProcessed {
+            get { return this.textBytesProcessed; }
+            set { this.textBytesProcessed = value; }
+        }
+
+        public FileStream FileStream {
+            get { return this.stream; }
+            set { this.stream = value; }
+        }
+
+        public BinaryWriter Writer {
+            get { return this.writer; }
+            set { this.writer = value; }
+        }
+
+        public int TextLength {
+            get { return this.textLength; }
+            set { this.textLength = value; }
+        }
+
+        public long FileLength {
+            get { return this.fileLength; }
+            set { this.fileLength = value; }
+        }
+
+        public int PrefixAndFileNameBytesToSend {
+            get { return this.prefixAndFileNameBytesToSend; }
+            set { this.prefixAndFileNameBytesToSend = value; }
         }
         #endregion
     }
