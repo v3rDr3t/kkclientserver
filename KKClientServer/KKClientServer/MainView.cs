@@ -71,23 +71,31 @@ namespace KKClientServer {
         /// <param name="sender">The sender.</param>
         /// <param name="e">The event.</param>
         private void onSendBtn_Click(object sender, EventArgs e) {
-            string hostAddress = this.fileTransferTabs.SelectedTab.Name;
-            if (!this.sendTextTB.Text.Equals("")) {
-                Print("Initiate sending text \"" + this.sendTextTB.Text + "\"...");
-                controller.SendMessageTo(hostAddress, this.sendTextTB.Text);
-            }
-            if (File.Exists(this.sendFileTB.Text)) {
-                FileInfo fileInfo = new FileInfo(this.sendFileTB.Text);
-                if (fileInfo.Length < int.MaxValue - Constants.PREFIX_SIZE) {
-                    Print("Initiate sending file \"" + this.sendFileTB.Text + "\"...");
-                    controller.SendFileTo(hostAddress, fileInfo);
-                } else {
-                    Print("File \"" + this.sendFileTB.Text + "\" mustn't be bigger than "
-                        + (int.MaxValue - Constants.PREFIX_SIZE));
+            // get selected client
+            TabPage clientPage = this.fileTransferTabs.SelectedTab;
+            if (clientPage != null) {
+                string hostAddress = this.fileTransferTabs.SelectedTab.Name;
+                
+                // send text message
+                if (!this.sendTextTB.Text.Equals("")) {
+                    Print("Initiate sending text \"" + this.sendTextTB.Text + "\"...");
+                    controller.SendMessageTo(hostAddress, this.sendTextTB.Text);
                 }
-            } else {
-                if (!this.sendFileTB.Text.Equals("")) {
-                    Print("File \"" + this.sendFileTB.Text + "\" does not exist");
+
+                // send file
+                if (File.Exists(this.sendFileTB.Text)) {
+                    FileInfo fileInfo = new FileInfo(this.sendFileTB.Text);
+                    if (fileInfo.Length < int.MaxValue - Constants.PREFIX_SIZE) {
+                        Print("Initiate sending file \"" + this.sendFileTB.Text + "\"...");
+                        controller.SendFileTo(hostAddress, fileInfo);
+                    } else {
+                        Print("File \"" + this.sendFileTB.Text + "\" mustn't be bigger than "
+                            + (int.MaxValue - Constants.PREFIX_SIZE));
+                    }
+                } else {
+                    if (!this.sendFileTB.Text.Equals("")) {
+                        Print("File \"" + this.sendFileTB.Text + "\" does not exist");
+                    }
                 }
             }
             this.sendTextTB.Clear();

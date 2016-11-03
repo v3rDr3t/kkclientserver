@@ -191,7 +191,7 @@ namespace KKClientServer.Networking {
 
             // handle the prefix
             int bytesToProcess = receiveEA.BytesTransferred;
-            Console.WriteLine("Receive> Received " + bytesToProcess + " bytes.");
+            Console.WriteLine("\nReceive> Received " + bytesToProcess + " bytes.");
             if (token.PrefixBytesReceived < Constants.PREFIX_SIZE) {
                 bytesToProcess = receiveHandler.HandlePrefix(receiveEA, token, bytesToProcess);
                 // post another receive operation in case prefix is incomplete
@@ -202,12 +202,11 @@ namespace KKClientServer.Networking {
             }
 
             // handle the text data
-            Console.WriteLine("Receive> TextBytesReceived = " + token.TextBytesReceived);
-            Console.WriteLine("Receive> TextLength = " + token.TextLength);
+            Console.WriteLine("Receive> " + bytesToProcess + " text bytes to process.");
             if (token.TextBytesReceived < token.TextLength) {
                 bytesToProcess = receiveHandler.HandleText(receiveEA, token, bytesToProcess);
                 // post another receive operation in case text is incomplete
-                if (bytesToProcess == 0) {
+                if (bytesToProcess == 0 && token.FilePath.Equals("")) {
                     startReceiving(receiveEA);
                     return;
                 }
@@ -215,8 +214,7 @@ namespace KKClientServer.Networking {
 
             // handle the file data
             if (token.Type == MessageType.File) {
-                //bool complete = receiveHandler.HandleFile(receiveEA, token, bytesToProcess);
-                bool complete = true;
+                bool complete = receiveHandler.HandleFile(receiveEA, token, bytesToProcess);
                 if (complete) {
                     // report back                    
                     string text = token.GetReceivedText(receiveEA);
@@ -226,7 +224,7 @@ namespace KKClientServer.Networking {
                     token.Reset();
                 } else {
                     token.FileOffset = token.ReceiveBufferOffset;
-                    //token.PrefixBytesProcessed = 0;
+                    Console.WriteLine("Receive> FileOffset = " + token.FileOffset);
                 }
             } else {
                 // report back                    
@@ -315,10 +313,11 @@ namespace KKClientServer.Networking {
             switch (saea.LastOperation) {
                 case SocketAsyncOperation.Send:
                     TransferData token = (TransferData)saea.UserToken;
-                    if (token.Type == MessageType.Text)
+                    if (token.Type == MessageType.Text) {
                         processSendText(saea);
-                    else
+                    } else {
                         processSendFile(saea);
+                    }
                     break;
 
                 case SocketAsyncOperation.Receive:
@@ -462,12 +461,16 @@ namespace KKClientServer.Networking {
             int bytesSent = checkedConversion(token.BytesSent, "startSendingText: ulong to int");
 
             // message fits into buffer
+            Console.WriteLine("Send> Bytes left to send: " + bytesLeft);
             if (bytesLeft <= Constants.BUFFER_SIZE) {
                 sendEA.SetBuffer(token.SendBufferOffset, bytesLeft);
                 Buffer.BlockCopy(
                     token.TextData, bytesSent,
                     sendEA.Buffer, token.SendBufferOffset,
                     bytesLeft);
+                byte[] array = new byte[bytesLeft];
+                Buffer.BlockCopy(sendEA.Buffer, token.SendBufferOffset, array, 0, bytesLeft);
+                Console.WriteLine("Send> Sending bytes (complete): " + BitConverter.ToString(array) + "\n");
             }
             // message doesn't fit into buffer (send as much as possible)
             else {
@@ -476,6 +479,9 @@ namespace KKClientServer.Networking {
                     token.TextData, bytesSent,
                     sendEA.Buffer, token.SendBufferOffset,
                     Constants.BUFFER_SIZE);
+                byte[] array = new byte[Constants.BUFFER_SIZE];
+                Buffer.BlockCopy(sendEA.Buffer, token.SendBufferOffset, array, 0, Constants.BUFFER_SIZE);
+                Console.WriteLine("Send> Sending bytes (incomplete): " + BitConverter.ToString(array) + "\n");
             }
 
             // post the send operation
@@ -494,6 +500,7 @@ namespace KKClientServer.Networking {
 
             if (sendEA.SocketError == SocketError.Success) {
                 token.RemainingBytesToSend -= sendEA.BytesTransferred;
+                Console.WriteLine("Send> RemainingBytesToSend: " + token.RemainingBytesToSend);
                 if (token.RemainingBytesToSend != 0L) {
                     // not all data has been successfully transfered yet
                     token.BytesSent += sendEA.BytesTransferred;
@@ -516,6 +523,7 @@ namespace KKClientServer.Networking {
         /// <param name="ip">The host ip.</param>
         /// <param name="fileInfo">The file information.</param>
         internal void SendFileTo(string ip, FileInfo fileInfo) {
+            Console.WriteLine("Send> Send file to...");
             IPAddress address = IPAddress.Parse(ip);
             IPEndPoint remoteEP = new IPEndPoint(address, Constants.DEFAULT_PORT);
             // try to send

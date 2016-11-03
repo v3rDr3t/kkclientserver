@@ -44,8 +44,9 @@ namespace KKClientServer.Networking {
         // -----------------------------------------------------
 
         // text length read from prefix
-        private int textLength;
-        private long fileLength;
+        private int textLength = 0;
+        private string filePath = "";
+        private long fileLength = 0L;
         #endregion
 
         /// <summary>
@@ -58,6 +59,8 @@ namespace KKClientServer.Networking {
             this.sendBufferOffset = saea.Offset + Constants.BUFFER_SIZE;
             // set data offset
             this.textOffset = this.receiveBufferOffset + Constants.PREFIX_SIZE;
+            // will be appended when prefix is received
+            this.fileOffset = this.receiveBufferOffset + Constants.PREFIX_SIZE;
             this.originalTextOffset = this.textOffset;
         }
 
@@ -178,6 +181,11 @@ namespace KKClientServer.Networking {
         public long FileLength {
             get { return this.fileLength; }
             set { this.fileLength = value; }
+        }
+
+        public string FilePath {
+            get { return this.filePath; }
+            set { this.filePath = value; }
         }
 
         public int PrefixAndFileNameBytesToSend {

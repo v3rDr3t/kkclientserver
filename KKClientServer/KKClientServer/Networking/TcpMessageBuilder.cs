@@ -7,8 +7,8 @@ using System.Text;
 namespace KKClientServer {
 
     internal enum MessageType : byte {
-        Text = 1,
-        File = 2,
+        Text = 131,
+        File = 135,
     }
 
     internal class TcpMessageBuilder {
@@ -21,6 +21,8 @@ namespace KKClientServer {
         internal void BuildTextData(string text, SocketAsyncEventArgs saea) {
             TransferData token = (TransferData)saea.UserToken;
 
+            // set type
+            token.Type = MessageType.Text;
             int textLength = text.Length;
             // convert text message to byte array
             byte[] textAsBytes = Encoding.Default.GetBytes(text);
@@ -30,7 +32,7 @@ namespace KKClientServer {
             // serialize
             token.TextData = new byte[Constants.PREFIX_SIZE + textLength];
             // (type)
-            Buffer.SetByte(token.TextData, 0, (byte)MessageType.Text);
+            Buffer.SetByte(token.TextData, 0, (byte)token.Type);
             // (text length)
             Buffer.BlockCopy(
                 lengthAsBytes, 0,
@@ -55,6 +57,8 @@ namespace KKClientServer {
         internal void BuildFileInfoData(FileInfo fileInfo, SocketAsyncEventArgs saea) {
             TransferData token = (TransferData)saea.UserToken;
 
+            // set type
+            token.Type = MessageType.File;
             // get file information
             int fileNameLength = fileInfo.Name.Length;
             long fileLength = fileInfo.Length;
@@ -66,7 +70,7 @@ namespace KKClientServer {
             // serialize
             token.TextData = new byte[Constants.PREFIX_SIZE + fileNameLength];
             // (type)
-            Buffer.SetByte(token.TextData, 0, (byte)MessageType.File);
+            Buffer.SetByte(token.TextData, 0, (byte)token.Type);
             // (file name length)
             Buffer.BlockCopy(
                 fileNameLengthAsBytes, 0,

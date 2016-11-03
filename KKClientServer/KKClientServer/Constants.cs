@@ -14,7 +14,7 @@ namespace KKClientServer {
         public const int MAX_NUM_CONNECTIONS = 100;
 
         // size of the data buffer.
-        public const int BUFFER_SIZE = 512;
+        public const int BUFFER_SIZE = 4;
 
         // maximum number of asynchronous send/receive operations that can be
         // posted simultaneously
