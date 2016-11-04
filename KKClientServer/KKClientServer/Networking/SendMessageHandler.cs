@@ -11,7 +11,7 @@ namespace KKClientServer.Networking {
         /// <param name="sendEA">The send event args.</param>
         /// <param name="token">The user token of the event args.</param>
         /// <returns>The remainder of file bytes to send.</returns>
-        internal long HandlePrefixAndFileName(SocketAsyncEventArgs sendEA, TransferData token) {
+        internal long HandlePrefixAndFileName(SocketAsyncEventArgs sendEA, SendToken token) {
             int bytesSent = NetworkController.checkedConversion(token.BytesSent, "HandlePrefix: ulong to int");
 
             // prefix and file name were already sent
@@ -55,7 +55,7 @@ namespace KKClientServer.Networking {
         /// </summary>
         /// <param name="sendEA">The send event args.</param>
         /// <param name="token">The user token of the event args.</param>
-        internal void HandleFile(SocketAsyncEventArgs sendEA, TransferData token, long fileDataToProcess) {
+        internal void HandleFile(SocketAsyncEventArgs sendEA, SendToken token, long fileDataToProcess) {
             if (fileDataToProcess > 0) {
                 try {
                     //Console.WriteLine("Send> Reading " + fileDataToProcess + " bytes of file data...");

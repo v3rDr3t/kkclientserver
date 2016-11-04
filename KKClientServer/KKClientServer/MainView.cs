@@ -84,14 +84,7 @@ namespace KKClientServer {
 
                 // send file
                 if (File.Exists(this.sendFileTB.Text)) {
-                    FileInfo fileInfo = new FileInfo(this.sendFileTB.Text);
-                    if (fileInfo.Length < int.MaxValue - Constants.PREFIX_SIZE) {
-                        Print("Initiate sending file \"" + this.sendFileTB.Text + "\"...");
-                        controller.SendFileTo(hostAddress, fileInfo);
-                    } else {
-                        Print("File \"" + this.sendFileTB.Text + "\" mustn't be bigger than "
-                            + (int.MaxValue - Constants.PREFIX_SIZE));
-                    }
+                    initiateSendFile(hostAddress);
                 } else {
                     if (!this.sendFileTB.Text.Equals("")) {
                         Print("File \"" + this.sendFileTB.Text + "\" does not exist");
@@ -100,6 +93,59 @@ namespace KKClientServer {
             }
             this.sendTextTB.Clear();
             this.sendFileTB.Clear();
+        }
+
+        /// <summary>
+        /// Initiates file transfer to a given host address.
+        /// </summary>
+        /// <param name="hostAddress">The host address.</param>
+        private void initiateSendFile(string hostAddress) {
+            FileInfo fileInfo = new FileInfo(this.sendFileTB.Text);
+            if (fileInfo.Length < int.MaxValue - Constants.PREFIX_SIZE) {
+                // add item to list view
+                TabPage tabPage = this.fileTransferTabs.TabPages[hostAddress];
+                ListView listView = (ListView)tabPage.Controls["lv_" + hostAddress];
+                int idx = listView.Items.Count + 1;
+                string[] row = { idx.ToString(), Path.GetFileName(this.sendFileTB.Text), "0%" };
+                var item = new ListViewItem(row);
+                listView.Items.Add(item);
+                // send file
+                Print("Initiate sending file \"" + this.sendFileTB.Text + "\"...");
+                controller.SendFileTo(hostAddress, fileInfo);
+            } else {
+                Print("File \"" + this.sendFileTB.Text + "\" mustn't be bigger than "
+                    + (int.MaxValue - Constants.PREFIX_SIZE));
+            }
+        }
+
+        /// <summary>
+        /// Visually updates the progress of a file transfer.
+        /// </summary>
+        /// <param name="ip">The host address.</param>
+        /// <param name="fileName">The file name.</param>
+        /// <param name="progress">The progress.</param>
+        internal void UpdateProgressOnFile(string ip, string fileName, double progress) {
+            // get progress string
+            int prog = Convert.ToInt32(progress * 100);
+            string progressString = prog  + "%";
+
+            // handle main view modification from another thread
+            if (this.fileTransferTabs.InvokeRequired) {
+                UpdateProgressOnFile_Callback callback = new UpdateProgressOnFile_Callback(UpdateProgressOnFile);
+                this.Invoke(callback, new object[] { ip, fileName, progress });
+            } else {
+                TabPage tabPage = this.fileTransferTabs.TabPages[ip];
+                if (tabPage != null) {
+                    ListView listView = (ListView)tabPage.Controls["lv_" + ip];
+                    foreach (ListViewItem item in listView.Items) {
+                        if (item.SubItems[1].Text.Equals(fileName) && !item.SubItems[2].Text.Equals("100%")) {
+                            if (!item.SubItems[2].Text.Equals(progressString)) {
+                                item.SubItems[2].Text = progressString;
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -171,14 +217,14 @@ namespace KKClientServer {
             toolStripButton2});
 
             // create column controls
-            ColumnHeader fileTransferIDCol = ((ColumnHeader)(new ColumnHeader()));
+            ColumnHeader fileTransferIDCol = new ColumnHeader();
             fileTransferIDCol.Text = "ID";
 
-            ColumnHeader fileTransferFileNameCol = ((ColumnHeader)(new ColumnHeader()));
+            ColumnHeader fileTransferFileNameCol = new ColumnHeader();
             fileTransferFileNameCol.Text = "Filename";
             fileTransferFileNameCol.Width = 390;
 
-            ColumnHeader fileTransferProgressCol = ((ColumnHeader)(new ColumnHeader()));
+            ColumnHeader fileTransferProgressCol = new ColumnHeader();
             fileTransferProgressCol.Text = "Progress";
             fileTransferProgressCol.TextAlign = HorizontalAlignment.Right;
             fileTransferProgressCol.Width = 55;
@@ -187,7 +233,7 @@ namespace KKClientServer {
             ListView listView = new ListView();
             listView.Anchor = ((((AnchorStyles.Top | AnchorStyles.Bottom) | AnchorStyles.Left) | AnchorStyles.Right));
             listView.Location = new Point(3, 31);
-            listView.Name = id;
+            listView.Name = "lv_" + id;
             listView.Size = new Size(517, 149);
             listView.TabIndex = 10;
             listView.UseCompatibleStateImageBehavior = false;
@@ -209,7 +255,7 @@ namespace KKClientServer {
         /// </summary>
         /// <param name="sender">The sender.</param>
         /// <param name="e">The event.</param>
-        private void disconnectBtn_Click(Object sender, EventArgs e) {
+        private void disconnectBtn_Click(object sender, EventArgs e) {
             string hostAddress = ((ToolStripButton)sender).Name;
             Print("Disconnecting from \"" + hostAddress + "\".");
             controller.DisconnectFrom(hostAddress);
@@ -221,10 +267,17 @@ namespace KKClientServer {
         /// </summary>
         /// <param name="sender">The sender.</param>
         /// <param name="e">The event.</param>
-        private void clearBtn_Click(Object sender, EventArgs e) {
-            string origin = ((ToolStripButton)sender).Name;
-            Print("Clearing finished uploads to \"" + origin + "\"...");
-            // TODO
+        private void clearBtn_Click(object sender, EventArgs e) {
+            ToolStripButton origin = (ToolStripButton)sender;
+            string hostAddress = origin.Name;
+            // remove all finished uploads from list view
+            TabPage tabPage = (TabPage)origin.GetCurrentParent().Parent;
+            ListView listView = (ListView)tabPage.Controls["lv_" + hostAddress];
+            foreach (ListViewItem item in listView.Items) {
+                if (item.SubItems[2].Text.Equals("100%")) {
+                    item.Remove();
+                }
+            }
         }
 
         /// <summary>
@@ -266,5 +319,6 @@ namespace KKClientServer {
         delegate void Print_Callback(string msg);
         delegate void AddTab_Callback(string ip);
         delegate void RemoveTab_Callback(string ip);
+        delegate void UpdateProgressOnFile_Callback(string ip, string fileName, double progress);
     }
 }

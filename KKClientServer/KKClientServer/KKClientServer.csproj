@@ -51,6 +51,7 @@
   <ItemGroup>
     <Compile Include="Controller.cs" />
     <Compile Include="Constants.cs" />
+    <Compile Include="Networking\BaseToken.cs" />
     <Compile Include="Networking\NetworkController.cs" />
     <Compile Include="MainView.cs">
       <SubType>Form</SubType>
@@ -59,9 +60,10 @@
       <DependentUpon>MainView.cs</DependentUpon>
     </Compile>
     <Compile Include="Networking\ReceiveMessageHandler.cs" />
+    <Compile Include="Networking\ReceiveToken.cs" />
     <Compile Include="Networking\SendMessageHandler.cs" />
+    <Compile Include="Networking\SendToken.cs" />
     <Compile Include="Networking\TcpMessageBuilder.cs" />
-    <Compile Include="Networking\TransferData.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Networking\ManagedBuffer.cs" />

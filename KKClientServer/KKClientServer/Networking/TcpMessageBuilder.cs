@@ -19,7 +19,8 @@ namespace KKClientServer {
         /// <param name="text">The text message.</param>
         /// <param name="saea">The event args.</param>
         internal void BuildTextData(string text, SocketAsyncEventArgs saea) {
-            TransferData token = (TransferData)saea.UserToken;
+            SendToken token = (SendToken)saea.UserToken;
+            token.Text = text;
 
             // set type
             token.Type = MessageType.Text;
@@ -55,7 +56,7 @@ namespace KKClientServer {
         /// <param name="fileInfo">The file information.</param>
         /// <param name="saea">The event args.</param>
         internal void BuildFileInfoData(FileInfo fileInfo, SocketAsyncEventArgs saea) {
-            TransferData token = (TransferData)saea.UserToken;
+            SendToken token = (SendToken)saea.UserToken;
 
             // set type
             token.Type = MessageType.File;
@@ -95,6 +96,10 @@ namespace KKClientServer {
             token.RemainingBytesToSend = Convert.ToInt64(Constants.PREFIX_SIZE + fileNameLength)
                 + fileLength;
             token.BytesSent = 0;
+
+            // set progress information
+            token.Text = fileInfo.Name;
+            token.MessageSize = token.RemainingBytesToSend;
         }
     }
 }

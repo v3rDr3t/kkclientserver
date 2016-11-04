@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Net;
 
 namespace KKClientServer {
 
@@ -82,6 +83,10 @@ namespace KKClientServer {
         /// <param name="msg">The logging information.</param>
         internal void Print(string msg) {
             mainView.Print(msg);
+        }
+
+        internal void UpdateProgress(IPAddress address, string fileName, double progress) {
+            mainView.UpdateProgressOnFile(address.ToString(), fileName, progress);
         }
     }
 }
