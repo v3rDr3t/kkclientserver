@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System;
 using System.IO;
+using System.Timers;
 
 namespace KKClientServer.Networking {
     internal class NetworkController {
@@ -307,6 +308,21 @@ namespace KKClientServer.Networking {
             if (!pending) {
                 processConnect(connectEA);
             }
+
+            // timeout
+            Timer timer = new Timer();
+            timer.Interval = Constants.CONNECT_TIMEOUT;
+            timer.Elapsed += (sender, e) => onConnectTimer_Elapsed(sender, e, connectEA);
+            timer.Start();
+        }
+
+        private void onConnectTimer_Elapsed(object sender, ElapsedEventArgs e, SocketAsyncEventArgs connectEA) {
+            Timer timer = (Timer)sender;
+            if (!connectEA.AcceptSocket.Connected) {
+                timer.Stop();
+                // close socket
+                connectEA.AcceptSocket.Close();
+            }
         }
 
         /// <summary>
@@ -333,7 +349,6 @@ namespace KKClientServer.Networking {
             closeSocket(saea.AcceptSocket);
             // release all resources
             IPEndPoint remoteEP = saea.RemoteEndPoint as IPEndPoint;
-            this.connections.Remove(remoteEP);
             this.connectEventArgsPool.Push(saea);
             // report back
             controller.Print("Could not connect to host (" + remoteEP.Address.ToString() + ").");
@@ -349,7 +364,6 @@ namespace KKClientServer.Networking {
             } catch (Exception) {
                 // socket already closed
             }
-            socket.Close();
         }
 
         /// <summary>
@@ -626,6 +640,12 @@ namespace KKClientServer.Networking {
                     } else {
                         processSendFile(saea);
                     }
+                    break;
+
+                case SocketAsyncOperation.Disconnect:
+                    processDisconnect(saea);
+                    //report back
+                    controller.Print("Client closed connection. Message transfer incomplete.");
                     break;
 
                 default:

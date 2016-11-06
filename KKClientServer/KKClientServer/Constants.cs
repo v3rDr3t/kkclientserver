@@ -10,6 +10,9 @@ namespace KKClientServer {
         // default port
         public const int DEFAULT_PORT = 51010;
 
+        // timeout for a connection request
+        public const int CONNECT_TIMEOUT = 2000;
+
         // maximum number of connections for send/receive
         public const int MAX_NUM_CONNECTIONS = 100;
 
