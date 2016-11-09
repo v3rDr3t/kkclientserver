@@ -47,8 +47,8 @@ namespace KKClientServer.Networking {
             this.connections = new Dictionary<IPEndPoint, SocketAsyncEventArgs>();
             this.connectEventArgsPool = new SocketOperationPool(Constants.MAX_ASYNC_CONNECT_OPS);
             this.acceptEventArgsPool = new SocketOperationPool(Constants.MAX_ASYNC_ACCEPT_OPS);
-            this.sendEventArgsPool = new SocketOperationPool(Constants.MAX_ASYNC_SEND_OPS);
-            this.receiveEventArgsPool = new SocketOperationPool(Constants.MAX_ASYNC_REC_OPS);
+            this.sendEventArgsPool = new SocketOperationPool(Constants.MAX_NUM_CONNECTIONS);
+            this.receiveEventArgsPool = new SocketOperationPool(Constants.MAX_NUM_CONNECTIONS);
             this.messageBuilder = new TcpMessageBuilder();
             this.receiveHandler = new ReceiveMessageHandler();
             this.sendHandler = new SendMessageHandler();
@@ -66,7 +66,7 @@ namespace KKClientServer.Networking {
             
             // preallocate send pool
             SocketAsyncEventArgs sendEA;
-            for (int i = 0; i < 5; i++) {
+            for (int i = 0; i < Constants.MAX_NUM_CONNECTIONS; i++) {
                 sendEA = new SocketAsyncEventArgs();
                 sendEA.Completed += new EventHandler<SocketAsyncEventArgs>(onSend_Completed);
                 this.buffer.Set(sendEA);
@@ -79,7 +79,7 @@ namespace KKClientServer.Networking {
 
             // preallocate receive pool
             SocketAsyncEventArgs receiveEA;
-            for (int i = 0; i < 5; i++) {
+            for (int i = 0; i < Constants.MAX_NUM_CONNECTIONS; i++) {
                 receiveEA = new SocketAsyncEventArgs();
                 receiveEA.Completed += new EventHandler<SocketAsyncEventArgs>(onReceive_Completed);
                 this.buffer.Set(receiveEA);
@@ -316,6 +316,12 @@ namespace KKClientServer.Networking {
             timer.Start();
         }
 
+        /// <summary>
+        /// Callback for elapsed timer event.
+        /// </summary>
+        /// <param name="sender">The sender.</param>
+        /// <param name="e">The elapsed event args.</param>
+        /// <param name="connectEA">The connect event args.</param>
         private void onConnectTimer_Elapsed(object sender, ElapsedEventArgs e, SocketAsyncEventArgs connectEA) {
             Timer timer = (Timer)sender;
             if (!connectEA.AcceptSocket.Connected) {
@@ -364,6 +370,8 @@ namespace KKClientServer.Networking {
             } catch (Exception) {
                 // socket already closed
             }
+            if (socket != null)
+                socket.Close();
         }
 
         /// <summary>
@@ -382,7 +390,6 @@ namespace KKClientServer.Networking {
         /// </summary>
         /// <param name="saea">The event args.</param>
         private void startDisconnecting(SocketAsyncEventArgs saea) {
-            //saea.AcceptSocket.Shutdown(SocketShutdown.Both);
             bool pending = saea.AcceptSocket.DisconnectAsync(saea);
             if (!pending) {
                 processDisconnect(saea);
@@ -394,7 +401,6 @@ namespace KKClientServer.Networking {
         /// </summary>
         /// <param name="saea">The event args.</param>
         private void processDisconnect(SocketAsyncEventArgs saea) {
-            // close socket
             closeSocket(saea.AcceptSocket);
             // release all resources
             IPEndPoint remoteEP = saea.RemoteEndPoint as IPEndPoint;
@@ -451,8 +457,8 @@ namespace KKClientServer.Networking {
         /// <param name="sendEA">The send event args.</param>
         private void startSendingText(SocketAsyncEventArgs sendEA) {
             SendToken token = (SendToken)sendEA.UserToken;
-            int bytesLeft = checkedConversion(token.RemainingBytesToSend, "startSendingText: ulong to int");
-            int bytesSent = checkedConversion(token.BytesSent, "startSendingText: ulong to int");
+            int bytesLeft = checkedConversion(token.RemainingBytesToSend);
+            int bytesSent = checkedConversion(token.BytesSent);
 
             // message fits into buffer
             //Console.WriteLine("Send> Bytes left to send: " + bytesLeft);
@@ -516,9 +522,9 @@ namespace KKClientServer.Networking {
         /// <param name="ip">The host ip.</param>
         /// <param name="fileInfo">The file information.</param>
         internal void SendFileTo(string ip, FileInfo fileInfo) {
-            Console.WriteLine("Send> Send file " + fileInfo.Name);
             IPAddress address = IPAddress.Parse(ip);
             IPEndPoint remoteEP = new IPEndPoint(address, Constants.DEFAULT_PORT);
+
             // try to send
             if (this.connections.ContainsKey(remoteEP)) {
                 SocketAsyncEventArgs sendEA = getSendEventArgs(remoteEP);
@@ -539,10 +545,10 @@ namespace KKClientServer.Networking {
         /// <param name="sendEA">The send/receive event args.</param>
         private void startSendingFile(SocketAsyncEventArgs sendEA) {
             SendToken token = (SendToken)sendEA.UserToken;
-            int bytesLeft = checkedConversion(token.RemainingBytesToSend, "startSendingFile");
 
             // message fits into buffer
-            if (bytesLeft <= Constants.BUFFER_SIZE) {
+            if (token.RemainingBytesToSend <= Constants.BUFFER_SIZE) {
+                int bytesLeft = checkedConversion(token.RemainingBytesToSend);
                 sendEA.SetBuffer(token.SendBufferOffset, bytesLeft);
             }
             // message doesn't fit into buffer (send as much as possible)
@@ -550,14 +556,20 @@ namespace KKClientServer.Networking {
                 sendEA.SetBuffer(token.SendBufferOffset, Constants.BUFFER_SIZE);
             }
             // handle prefix
-            long fileDataToProcess = sendHandler.HandlePrefixAndFileName(sendEA, token);
+            int fileDataToProcess = sendHandler.HandlePrefixAndFileName(sendEA, token);
             // handle file
-            sendHandler.HandleFile(sendEA, token, fileDataToProcess);
-            
-            // post the send operation
-            bool pending = sendEA.AcceptSocket.SendAsync(sendEA);
-            if (!pending) {
-                processSendFile(sendEA);
+            bool success = sendHandler.HandleFile(sendEA, token, fileDataToProcess);
+            if (success) {
+                // post the send operation
+                bool pending = sendEA.AcceptSocket.SendAsync(sendEA);
+                if (!pending) {
+                    processSendFile(sendEA);
+                }
+            } else {
+                // report back
+                controller.Print("An error occured while reading file \"" + token.Text + "\".");
+                token.Reset();
+                this.sendEventArgsPool.Push(sendEA);
             }
         }
 
@@ -567,31 +579,30 @@ namespace KKClientServer.Networking {
         /// <param name="sendEA">The send event args.</param>
         private void processSendFile(SocketAsyncEventArgs sendEA) {
             SendToken token = (SendToken)sendEA.UserToken;
-
             if (sendEA.SocketError == SocketError.Success) {
                 token.RemainingBytesToSend -= sendEA.BytesTransferred;
                 token.BytesSent += sendEA.BytesTransferred;
-                //Console.WriteLine("Receive> BytesSent: " + token.BytesSent + ".");
-                //Console.WriteLine("Receive> MessageSize: " + token.MessageSize + ".");
                 // report progress
                 IPEndPoint remoteEP = sendEA.AcceptSocket.RemoteEndPoint as IPEndPoint;
                 double progress = (double)token.BytesSent / token.MessageSize;
-                //Console.WriteLine("Receive> Progress: " + progress + ".");
                 controller.UpdateProgress(remoteEP.Address, token.Text, progress);
 
+                // file transfer incomplete
                 if (token.RemainingBytesToSend > 0L) {
-                    // not the whole message has been successfully transfered yet
                     int toSend = token.PrefixAndFileNameBytesToSend - sendEA.BytesTransferred;
                     token.PrefixAndFileNameBytesToSend = (toSend > 0) ? toSend : 0;
                     startSendingFile(sendEA);
-                } else {
+                }
+                // file transfer complete
+                else {
+                    // report back
+                    controller.Print("File transfer complete.");
                     token.Reset();
                     this.sendEventArgsPool.Push(sendEA);
-                    //report back
-                    controller.Print("File transfer complete.");
                 }
             } else {
-                // a socket error occured
+                // report back
+                controller.Print("A socket error occured while sending file \"" + token.Text + "\".");
                 token.Reset();
                 startDisconnecting(sendEA);
             }
@@ -673,15 +684,9 @@ namespace KKClientServer.Networking {
         /// Performs a checked convertion of a given signed long to integer.
         /// </summary>
         /// <param name="n">The signed long.</param>
-        /// <param name="err">An optional error message.</param>
-        public static int checkedConversion(long n, string err) {
+        public static int checkedConversion(long n) {
             int ret;
-            try {
-                ret = checked((int)n);
-            } catch (OverflowException ex) {
-                ex.Data.Add("Message", err);
-                throw;
-            }
+            ret = checked((int)n);
             return ret;
         }
     }

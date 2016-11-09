@@ -21,7 +21,6 @@ namespace KKClientServer.Networking {
 
             // prefix has been received completely
             if (bytesToProcess >= Constants.PREFIX_SIZE - token.PrefixBytesReceived) {
-                //Console.WriteLine("Receive> Prefix has been received completely.");
                 // copy data bytes
                 Buffer.BlockCopy(
                     receiveEA.Buffer,
@@ -29,12 +28,6 @@ namespace KKClientServer.Networking {
                     token.Prefix,
                     token.PrefixBytesReceived,
                     Constants.PREFIX_SIZE - token.PrefixBytesReceived);
-
-                //byte[] array = new byte[Constants.PREFIX_SIZE - token.PrefixBytesReceived];
-                //Buffer.BlockCopy(receiveEA.Buffer, token.TextOffset - Constants.PREFIX_SIZE + token.PrefixBytesReceived,
-                //    array, 0,
-                //    Constants.PREFIX_SIZE - token.PrefixBytesReceived);
-                //Console.WriteLine("Receive> Prefix bytes: " + BitConverter.ToString(array));
 
                 // process prefix
                 token.Type = (MessageType)token.Prefix[0];
@@ -51,11 +44,9 @@ namespace KKClientServer.Networking {
 
                 // append file offset
                 token.FileOffset += token.TextLength;
-                //Console.WriteLine("Receive> FileOffset = " + token.FileOffset);
             }
             // prefix has been received incompletely
             else {
-                //Console.WriteLine("Receive> Prefix has been received incompletely.");
                 // copy prefix bytes
                 Buffer.BlockCopy(
                     receiveEA.Buffer,
@@ -63,12 +54,6 @@ namespace KKClientServer.Networking {
                     token.Prefix,
                     token.PrefixBytesReceived,
                     bytesToProcess);
-
-                //byte[] array = new byte[bytesToProcess];
-                //Buffer.BlockCopy(receiveEA.Buffer, token.TextOffset - Constants.PREFIX_SIZE + token.PrefixBytesReceived,
-                //    array, 0,
-                //    bytesToProcess);
-                //Console.WriteLine("Receive> Prefix bytes: " + BitConverter.ToString(array));
 
                 token.PrefixBytesProcessed = bytesToProcess;
                 token.PrefixBytesReceived += bytesToProcess;
@@ -98,7 +83,6 @@ namespace KKClientServer.Networking {
 
             // text data has been received completely
             if (bytesToProcess >= token.TextLength - token.TextBytesReceived) {
-                //Console.WriteLine("Receive> Text has been received completely.");
                 // copy text data bytes
                 Buffer.BlockCopy(
                     receiveEA.Buffer,
@@ -106,10 +90,6 @@ namespace KKClientServer.Networking {
                     token.TextData,
                     token.TextBytesReceived,
                     token.TextLength - token.TextBytesReceived);
-
-                //byte[] array = new byte[token.TextLength - token.TextBytesReceived];
-                //Buffer.BlockCopy(receiveEA.Buffer, token.TextOffset, array, 0, token.TextLength - token.TextBytesReceived);
-                //Console.WriteLine("Receive> Text bytes: " + BitConverter.ToString(array) + " = " + Encoding.Default.GetString(array));
 
                 // set byte counters
                 bytesToProcess = bytesToProcess - token.TextLength + token.TextBytesReceived;
@@ -123,7 +103,6 @@ namespace KKClientServer.Networking {
             }
             // text data has been received incompletely
             else {
-                //Console.WriteLine("Receive> Text has been received incompletely.");
                 // copy text data bytes
                 Buffer.BlockCopy(
                     receiveEA.Buffer,
@@ -131,10 +110,6 @@ namespace KKClientServer.Networking {
                     token.TextData,
                     token.TextBytesReceived,
                     bytesToProcess);
-
-                //byte[] array = new byte[bytesToProcess];
-                //Buffer.BlockCopy(receiveEA.Buffer, token.TextOffset, array, 0, bytesToProcess);
-                //Console.WriteLine("Receive> Text bytes: " + BitConverter.ToString(array) + " = " + Encoding.Default.GetString(array));
 
                 token.TextBytesProcessed = bytesToProcess;
                 token.TextBytesReceived += bytesToProcess;
@@ -165,24 +140,12 @@ namespace KKClientServer.Networking {
 
             // file has been received completely.
             if (bytesToProcess + token.FileBytesReceived == token.FileLength) {
-                //Console.WriteLine("Receive> File complete: Writing " + bytesToProcess + " bytes.");
                 token.Writer.Write(receiveEA.Buffer, token.FileOffset, bytesToProcess);
-
-                //byte[] array = new byte[bytesToProcess];
-                //Buffer.BlockCopy(receiveEA.Buffer, token.FileOffset, array, 0, bytesToProcess);
-                //Console.WriteLine("Receive> File bytes: " + BitConverter.ToString(array) + " = " + Encoding.Default.GetString(array));
-
                 return true;
             }
             // file has been received incompletely
             else {
-                //Console.WriteLine("Receive> File incomplete: Writing " + bytesToProcess + " bytes.");
                 token.Writer.Write(receiveEA.Buffer, token.FileOffset, bytesToProcess);
-
-                //byte[] array = new byte[bytesToProcess];
-                //Buffer.BlockCopy(receiveEA.Buffer, token.FileOffset, array, 0, bytesToProcess);
-                //Console.WriteLine("Receive> File bytes: " + BitConverter.ToString(array) + " = " + Encoding.Default.GetString(array));
-
                 token.FileBytesReceived += bytesToProcess;
                 return false;
             }
@@ -196,12 +159,7 @@ namespace KKClientServer.Networking {
         /// <param name="count">The amount of bytes for the sub array.</param>
         private byte[] getSubArray(byte[] array, int offset, int count) {
             byte[] subArray = new byte[count];
-            Buffer.BlockCopy(
-                array,
-                offset,
-                subArray,
-                0,
-                count);
+            Buffer.BlockCopy(array, offset, subArray, 0, count);
             return subArray;
         }
     }

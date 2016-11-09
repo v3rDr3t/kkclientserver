@@ -25,7 +25,10 @@ namespace KKClientServer.Networking {
         /// Constructs a <see cref="SendToken"/> object.
         /// </summary>
         /// <param name="saea">The event args.</param>
-        public SendToken(SocketAsyncEventArgs saea) { }
+        public SendToken(SocketAsyncEventArgs saea) {
+            // set buffer offset
+            this.sendBufferOffset = saea.Offset + Constants.BUFFER_SIZE;
+        }
 
         /// <summary>
         /// Resets the state of the token.
@@ -36,6 +39,7 @@ namespace KKClientServer.Networking {
                 this.stream.Close();
                 this.stream = null;
             }
+            this.text = string.Empty;
         }
 
         #region Properties

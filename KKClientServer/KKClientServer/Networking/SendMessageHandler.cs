@@ -11,22 +11,19 @@ namespace KKClientServer.Networking {
         /// <param name="sendEA">The send event args.</param>
         /// <param name="token">The user token of the event args.</param>
         /// <returns>The remainder of file bytes to send.</returns>
-        internal long HandlePrefixAndFileName(SocketAsyncEventArgs sendEA, SendToken token) {
-            int bytesSent = NetworkController.checkedConversion(token.BytesSent, "HandlePrefix: ulong to int");
+        internal int HandlePrefixAndFileName(SocketAsyncEventArgs sendEA, SendToken token) {
+            int bytesLeft = NetworkController.checkedConversion(token.RemainingBytesToSend);
+            int bytesSent = NetworkController.checkedConversion(token.BytesSent);
 
             // prefix and file name were already sent
             if (token.PrefixAndFileNameBytesToSend == 0) {
-                //Console.WriteLine("Send> No more prefix or file name bytes to send: "
-                //    + token.PrefixAndFileNameBytesToSend + " == 0");
                 return (token.RemainingBytesToSend < Constants.BUFFER_SIZE)
-                    ? token.RemainingBytesToSend
+                    ? bytesLeft
                     : Constants.BUFFER_SIZE;
             }
 
             // prefix and file name fit into buffer
             if (token.PrefixAndFileNameBytesToSend < Constants.BUFFER_SIZE) {
-                //Console.WriteLine("Send> Remaining prefix and/or file name fit into buffer: " 
-                //    + token.PrefixAndFileNameBytesToSend + " < " + Constants.BUFFER_SIZE);
                 Buffer.BlockCopy(token.TextData,
                     bytesSent,
                     sendEA.Buffer,
@@ -34,13 +31,11 @@ namespace KKClientServer.Networking {
                     token.PrefixAndFileNameBytesToSend);
 
                 return (token.RemainingBytesToSend < Constants.BUFFER_SIZE)
-                    ? token.RemainingBytesToSend - token.PrefixAndFileNameBytesToSend
+                    ? bytesLeft - token.PrefixAndFileNameBytesToSend
                     : Constants.BUFFER_SIZE - token.PrefixAndFileNameBytesToSend;
             }
             // prefix and file name do not fit into buffer
             else {
-                //Console.WriteLine("Send> Remaining prefix and/or file name do not fit into buffer: "
-                //    + token.PrefixAndFileNameBytesToSend + " >= " + Constants.BUFFER_SIZE);
                 Buffer.BlockCopy(token.TextData,
                     bytesSent,
                     sendEA.Buffer,
@@ -55,35 +50,28 @@ namespace KKClientServer.Networking {
         /// </summary>
         /// <param name="sendEA">The send event args.</param>
         /// <param name="token">The user token of the event args.</param>
-        internal void HandleFile(SocketAsyncEventArgs sendEA, SendToken token, long fileDataToProcess) {
+        internal bool HandleFile(SocketAsyncEventArgs sendEA, SendToken token, int fileDataToProcess) {
             if (fileDataToProcess > 0) {
                 try {
-                    //Console.WriteLine("Send> Reading " + fileDataToProcess + " bytes of file data...");
+                    Console.WriteLine("Send> Processing " + fileDataToProcess + " bytes of file data...");
                     // read part of file into buffer
-                    int bytesToRead = NetworkController.checkedConversion(fileDataToProcess, "HandleFile: long to int");
+                    int bytesToRead = fileDataToProcess;
                     int offset = (token.PrefixAndFileNameBytesToSend > 0)
                         ? token.SendBufferOffset + token.PrefixAndFileNameBytesToSend
                         : token.SendBufferOffset;
                     while (bytesToRead > 0) {
                         int bytesRead = token.FileStream.Read(sendEA.Buffer, offset, bytesToRead);
-
-                        //Console.WriteLine("Send> Read " + bytesRead + " bytes. Offset = " + token.FileStream.Position);
-                        //byte[] array = new byte[bytesToRead];
-                        //Buffer.BlockCopy(sendEA.Buffer, offset,
-                        //    array, 0,
-                        //    bytesToRead);
-                        //Console.WriteLine("Send> File bytes: " + BitConverter.ToString(array) + " = " + System.Text.Encoding.Default.GetString(array) + "\n");
-
+                        Console.WriteLine("Send> Read " + bytesRead + " bytes. Offset = " + token.FileStream.Position);
                         if (bytesRead == 0)
                             break;
                         offset += bytesRead;
                         bytesToRead -= bytesRead;
                     }
-                } catch (Exception e) {
-                    // ...
-                    Console.WriteLine("Error> Reading from file stream: " + e.Message);
+                } catch (Exception) {
+                    return false;
                 }
             }
+            return true;
         }
     }
 }

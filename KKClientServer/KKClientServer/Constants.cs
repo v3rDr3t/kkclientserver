@@ -14,18 +14,10 @@ namespace KKClientServer {
         public const int CONNECT_TIMEOUT = 2000;
 
         // maximum number of connections for send/receive
-        public const int MAX_NUM_CONNECTIONS = 100;
+        public const int MAX_NUM_CONNECTIONS = 300;
 
         // size of the data buffer.
         public const int BUFFER_SIZE = 512;
-
-        // maximum number of asynchronous send/receive operations that can be
-        // posted simultaneously
-        public const int MAX_ASYNC_SEND_OPS = 500;
-
-        // maximum number of asynchronous send/receive operations that can be
-        // posted simultaneously
-        public const int MAX_ASYNC_REC_OPS = 250;
 
         // maximum number of asynchronous accept operations that can be
         // posted simultaneously

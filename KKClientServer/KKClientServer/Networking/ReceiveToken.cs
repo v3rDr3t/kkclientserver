@@ -20,7 +20,7 @@ namespace KKClientServer.Networking {
         private int textBytesReceived = 0;
         private int textBytesProcessed = 0;
 
-        private int fileBytesReceived = 0;
+        private long fileBytesReceived = 0;
 
         // The original buffer offset for text data
         private readonly int originalTextOffset;
@@ -40,7 +40,7 @@ namespace KKClientServer.Networking {
         // The file length read from prefix
         private long fileLength = 0L;
 
-        private string filePath = "";
+        private string filePath = String.Empty;
         #endregion
 
         /// <summary>
@@ -83,6 +83,9 @@ namespace KKClientServer.Networking {
                 this.writer.Close();
                 this.writer = null;
             }
+            this.textLength = 0;
+            this.fileLength = 0L;
+            this.filePath = String.Empty;
         }
 
         #region Properties
@@ -108,7 +111,7 @@ namespace KKClientServer.Networking {
             set { this.textBytesProcessed = value; }
         }
 
-        public int FileBytesReceived {
+        public long FileBytesReceived {
             get { return this.fileBytesReceived; }
             set { this.fileBytesReceived = value; }
         }
