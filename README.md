@@ -12,7 +12,7 @@ The default port is 51010.
 
 ## Caution
 
-This is the first attempt (of the author) of writing more complex socket code so there may still exist undetected errors because no elaborate testing was performed. For now functionality has only been tested within a local area network.
+This is the first attempt (of the author) of writing more complex socket code so there may still exist undetected errors because no elaborate testing was performed.
 
 ## Use
 
