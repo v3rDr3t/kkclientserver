@@ -3,7 +3,7 @@ using System.IO;
 using System.Net.Sockets;
 using System.Text;
 
-namespace KKClientServer.Networking {
+namespace ClientServer.Networking {
 
     internal class ReceiveMessageHandler {
 
@@ -78,7 +78,7 @@ namespace KKClientServer.Networking {
         public int HandleText(SocketAsyncEventArgs receiveEA, ReceiveToken token, int bytesToProcess) {
             // create the text byte array
             if (token.TextBytesReceived == 0) {
-                token.TextData = new byte[token.TextLength];
+                token.Data = new byte[token.TextLength];
             }
 
             // text data has been received completely
@@ -87,7 +87,7 @@ namespace KKClientServer.Networking {
                 Buffer.BlockCopy(
                     receiveEA.Buffer,
                     token.TextOffset,
-                    token.TextData,
+                    token.Data,
                     token.TextBytesReceived,
                     token.TextLength - token.TextBytesReceived);
 
@@ -99,7 +99,7 @@ namespace KKClientServer.Networking {
                     token.FileOffset -= token.PrefixBytesProcessed;
                 }
                 
-                token.FilePath = Encoding.Default.GetString(token.TextData);
+                token.FilePath = Encoding.Default.GetString(token.Data);
             }
             // text data has been received incompletely
             else {
@@ -107,7 +107,7 @@ namespace KKClientServer.Networking {
                 Buffer.BlockCopy(
                     receiveEA.Buffer,
                     token.TextOffset,
-                    token.TextData,
+                    token.Data,
                     token.TextBytesReceived,
                     bytesToProcess);
 
@@ -118,7 +118,7 @@ namespace KKClientServer.Networking {
 
             // set new offset
             if (bytesToProcess == 0) {
-                token.TextOffset = token.ReceiveBufferOffset;
+                token.TextOffset = token.BufferOffset;
                 token.FileOffset -= token.TextBytesProcessed;
                 token.RespectPrefixRemainderForOffset = true;
                 token.TextBytesProcessed = 0;
@@ -141,11 +141,13 @@ namespace KKClientServer.Networking {
             // file has been received completely.
             if (bytesToProcess + token.FileBytesReceived == token.FileLength) {
                 token.Writer.Write(receiveEA.Buffer, token.FileOffset, bytesToProcess);
+                token.Writer.Flush();
                 return true;
             }
             // file has been received incompletely
             else {
                 token.Writer.Write(receiveEA.Buffer, token.FileOffset, bytesToProcess);
+                token.Writer.Flush();
                 token.FileBytesReceived += bytesToProcess;
                 return false;
             }

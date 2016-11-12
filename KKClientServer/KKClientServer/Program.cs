@@ -1,8 +1,8 @@
-﻿using KKClientServer.Networking;
+﻿using ClientServer.Networking;
 using System;
 using System.Windows.Forms;
 
-namespace KKClientServer
+namespace ClientServer
 {
     static class Program
     {

@@ -1,10 +1,10 @@
-﻿using KKClientServer.Networking;
+﻿using ClientServer.Networking;
 using System;
 using System.IO;
 using System.Net.Sockets;
 using System.Text;
 
-namespace KKClientServer {
+namespace ClientServer {
 
     internal enum MessageType : byte {
         Text = 131,
@@ -31,18 +31,18 @@ namespace KKClientServer {
             byte[] lengthAsBytes = BitConverter.GetBytes(textLength);
 
             // serialize
-            token.TextData = new byte[Constants.PREFIX_SIZE + textLength];
+            token.Data = new byte[Constants.PREFIX_SIZE + textLength];
             // (type)
-            Buffer.SetByte(token.TextData, 0, (byte)token.Type);
+            Buffer.SetByte(token.Data, 0, (byte)token.Type);
             // (text length)
             Buffer.BlockCopy(
                 lengthAsBytes, 0,
-                token.TextData, Constants.TEXT_LENGTH_PREFIX_OFFSET,
+                token.Data, Constants.TEXT_LENGTH_PREFIX_OFFSET,
                 Constants.LENGTH_PREFIX_SIZE);
             // (text)
             Buffer.BlockCopy(
                 textAsBytes, 0,
-                token.TextData, Constants.PREFIX_SIZE,
+                token.Data, Constants.PREFIX_SIZE,
                 textLength);
 
             // set byte counters
@@ -69,23 +69,23 @@ namespace KKClientServer {
             byte[] fileNameAsBytes = Encoding.Default.GetBytes(fileInfo.Name);
 
             // serialize
-            token.TextData = new byte[Constants.PREFIX_SIZE + fileNameLength];
+            token.Data = new byte[Constants.PREFIX_SIZE + fileNameLength];
             // (type)
-            Buffer.SetByte(token.TextData, 0, (byte)token.Type);
+            Buffer.SetByte(token.Data, 0, (byte)token.Type);
             // (file name length)
             Buffer.BlockCopy(
                 fileNameLengthAsBytes, 0,
-                token.TextData, Constants.TEXT_LENGTH_PREFIX_OFFSET,
+                token.Data, Constants.TEXT_LENGTH_PREFIX_OFFSET,
                 Constants.LENGTH_PREFIX_SIZE);
             // (file length)
             Buffer.BlockCopy(
                 fileLengthAsBytes, 0,
-                token.TextData, Constants.FILE_LENGTH_PREFIX_OFFSET,
+                token.Data, Constants.FILE_LENGTH_PREFIX_OFFSET,
                 Constants.LENGTH_PREFIX_SIZE * 2);
             // (file name)
             Buffer.BlockCopy(
                 fileNameAsBytes, 0,
-                token.TextData, Constants.PREFIX_SIZE,
+                token.Data, Constants.PREFIX_SIZE,
                 fileNameLength);
 
             // set file stream

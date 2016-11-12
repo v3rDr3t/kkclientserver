@@ -1,4 +1,4 @@
-﻿using KKClientServer.Networking;
+﻿using ClientServer.Networking;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Net;
 
-namespace KKClientServer {
+namespace ClientServer {
 
     internal class Controller {
         #region Fields
@@ -25,7 +25,6 @@ namespace KKClientServer {
             mainView.AddController(this);
         }
 
-
         /// <summary>
         /// Delegates the connection to a host to the connection manager.
         /// </summary>
@@ -40,6 +39,14 @@ namespace KKClientServer {
         /// <param name="hostAddress">The host address to disconnect from.</param>
         internal void DisconnectFrom(string hostAddress) {
             this.netController.DisconnectFrom(hostAddress);
+        }
+
+        /// <summary>
+        /// Delegates a clean up procedure when exiting the application.
+        /// </summary>
+        /// <param name="hostAddress">The host address to disconnect from.</param>
+        internal void Exiting() {
+            this.netController.Exit();
         }
 
         /// <summary>
@@ -85,6 +92,10 @@ namespace KKClientServer {
             mainView.Print(msg);
         }
 
+        /// <summary>
+        /// Delegates the visual progress update to the main view.
+        /// </summary>
+        /// <param name="msg">The logging information.</param>
         internal void UpdateProgress(IPAddress address, string fileName, double progress) {
             mainView.UpdateProgressOnFile(address.ToString(), fileName, progress);
         }

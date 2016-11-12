@@ -1,14 +1,11 @@
 ﻿using System.IO;
 using System.Net.Sockets;
 
-namespace KKClientServer.Networking {
+namespace ClientServer.Networking {
 
     internal class SendToken : BaseToken {
         #region Fields
-        // the buffer offset for send operations
-        private readonly int sendBufferOffset;
-
-        // The byte sent counters
+        // The total byte counters
         private long remainingBytesToSend;
         private long bytesSent;
 
@@ -25,10 +22,7 @@ namespace KKClientServer.Networking {
         /// Constructs a <see cref="SendToken"/> object.
         /// </summary>
         /// <param name="saea">The event args.</param>
-        public SendToken(SocketAsyncEventArgs saea) {
-            // set buffer offset
-            this.sendBufferOffset = saea.Offset + Constants.BUFFER_SIZE;
-        }
+        public SendToken(SocketAsyncEventArgs saea) : base (saea) { }
 
         /// <summary>
         /// Resets the state of the token.
@@ -43,10 +37,6 @@ namespace KKClientServer.Networking {
         }
 
         #region Properties
-        public int SendBufferOffset {
-            get { return this.sendBufferOffset; }
-        }
-
         public long RemainingBytesToSend {
             get { return this.remainingBytesToSend; }
             set { this.remainingBytesToSend = value; }

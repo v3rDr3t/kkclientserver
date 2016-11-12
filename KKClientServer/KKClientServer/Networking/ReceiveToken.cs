@@ -6,13 +6,10 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KKClientServer.Networking {
+namespace ClientServer.Networking {
 
     internal class ReceiveToken : BaseToken {
         #region Fields
-        // the buffer offset for receive operations
-        private readonly int receiveBufferOffset;
-
         // Received bytes counters
         private int prefixBytesReceived = 0;
         private int prefixBytesProcessed = 0;
@@ -47,14 +44,12 @@ namespace KKClientServer.Networking {
         /// Constructs a <see cref="ReceiveToken"/> object.
         /// </summary>
         /// <param name="saea">The event args.</param>
-        public ReceiveToken(SocketAsyncEventArgs saea) {
-            // set buffer offset
-            this.receiveBufferOffset = saea.Offset;
+        public ReceiveToken(SocketAsyncEventArgs saea) : base(saea) {
             // set text data offset
-            this.textOffset = this.receiveBufferOffset + Constants.PREFIX_SIZE;
+            this.textOffset = this.BufferOffset + Constants.PREFIX_SIZE;
             this.originalTextOffset = this.textOffset;
             // set file data offset (will be appended when prefix is received)
-            this.fileOffset = this.receiveBufferOffset + Constants.PREFIX_SIZE;
+            this.fileOffset = this.BufferOffset + Constants.PREFIX_SIZE;
         }
 
         /// <summary>
@@ -62,7 +57,7 @@ namespace KKClientServer.Networking {
         /// </summary>
         /// <param name="saea">The event args.</param>
         internal string GetReceivedText() {
-            return Encoding.Default.GetString(base.TextData);
+            return Encoding.Default.GetString(base.Data);
         }
 
         /// <summary>
@@ -77,7 +72,7 @@ namespace KKClientServer.Networking {
             this.fileBytesReceived = 0;
             // data offsets
             this.textOffset = this.originalTextOffset;
-            this.fileOffset = this.receiveBufferOffset + Constants.PREFIX_SIZE;
+            this.fileOffset = this.BufferOffset + Constants.PREFIX_SIZE;
             // file writer
             if (this.writer != null) {
                 this.writer.Close();
@@ -89,10 +84,6 @@ namespace KKClientServer.Networking {
         }
 
         #region Properties
-        public int ReceiveBufferOffset {
-            get { return this.receiveBufferOffset; }
-        }
-
         public int PrefixBytesReceived {
             get { return this.prefixBytesReceived; }
             set { this.prefixBytesReceived = value; }

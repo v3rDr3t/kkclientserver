@@ -4,28 +4,33 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KKClientServer {
+namespace ClientServer {
 
     public class Constants {
         // default port
         public const int DEFAULT_PORT = 51010;
 
         // timeout for a connection request
-        public const int CONNECT_TIMEOUT = 2000;
-
-        // maximum number of connections for send/receive
-        public const int MAX_NUM_CONNECTIONS = 300;
+        public const int CONNECT_TIMEOUT = 5000;
 
         // size of the data buffer.
         public const int BUFFER_SIZE = 512;
 
-        // maximum number of asynchronous accept operations that can be
+        // maximum number of asynchronous send operations that can be
         // posted simultaneously
         public const int MAX_ASYNC_ACCEPT_OPS = 10;
 
         // maximum number of asynchronous connect operations that can be
         // posted simultaneously
         public const int MAX_ASYNC_CONNECT_OPS = 10;
+
+        // maximum number of asynchronous send operations that can be
+        // posted simultaneously
+        public const int MAX_ASYNC_SEND_OPS = 300;
+
+        // maximum number of asynchronous accept operations that can be
+        // posted simultaneously
+        public const int MAX_ASYNC_RECEIVE_OPS = 300;
 
         // for the managed buffer preallocation (1 for receive, 1 for send)
         public const int PREALLOCATION_OPS = 2;

@@ -5,7 +5,7 @@ using System;
 using System.IO;
 using System.Timers;
 
-namespace KKClientServer.Networking {
+namespace ClientServer.Networking {
     internal class NetworkController {
         #region Fields
         // The controller
@@ -13,7 +13,8 @@ namespace KKClientServer.Networking {
         // The server socket
         private Socket serverSocket;
         // Reusable set of buffers for all socket operations.
-        private ManagedBuffer buffer;
+        private ManagedBuffer sendBuffer;
+        private ManagedBuffer receiveBuffer;
         // Holds all currently open server connections
         private Dictionary<IPEndPoint, SocketAsyncEventArgs> connections;
         // Pool of reusable connect event args
@@ -38,17 +39,18 @@ namespace KKClientServer.Networking {
         internal NetworkController(Controller controller) {
             this.controller = controller;
 
-            // create buffer
-            int totalBufferSize = Constants.BUFFER_SIZE * Constants.MAX_NUM_CONNECTIONS * Constants.PREALLOCATION_OPS;
-            int bufferSizePerEventArgs = Constants.BUFFER_SIZE * Constants.PREALLOCATION_OPS;
-            this.buffer = new ManagedBuffer(totalBufferSize, bufferSizePerEventArgs);
+            // create buffers
+            int totalBufferSize = Constants.BUFFER_SIZE * Constants.MAX_ASYNC_SEND_OPS;
+            this.sendBuffer = new ManagedBuffer(totalBufferSize, Constants.BUFFER_SIZE);
+            totalBufferSize = Constants.BUFFER_SIZE * Constants.MAX_ASYNC_RECEIVE_OPS;
+            this.receiveBuffer = new ManagedBuffer(totalBufferSize, Constants.BUFFER_SIZE);
 
             // create networking
             this.connections = new Dictionary<IPEndPoint, SocketAsyncEventArgs>();
             this.connectEventArgsPool = new SocketOperationPool(Constants.MAX_ASYNC_CONNECT_OPS);
             this.acceptEventArgsPool = new SocketOperationPool(Constants.MAX_ASYNC_ACCEPT_OPS);
-            this.sendEventArgsPool = new SocketOperationPool(Constants.MAX_NUM_CONNECTIONS);
-            this.receiveEventArgsPool = new SocketOperationPool(Constants.MAX_NUM_CONNECTIONS);
+            this.sendEventArgsPool = new SocketOperationPool(Constants.MAX_ASYNC_SEND_OPS);
+            this.receiveEventArgsPool = new SocketOperationPool(Constants.MAX_ASYNC_RECEIVE_OPS);
             this.messageBuilder = new TcpMessageBuilder();
             this.receiveHandler = new ReceiveMessageHandler();
             this.sendHandler = new SendMessageHandler();
@@ -62,14 +64,15 @@ namespace KKClientServer.Networking {
         /// </summary>
         private void initializePools() {
             // allocate one large byte buffer block
-            this.buffer.Initialize();
-            
+            this.sendBuffer.Initialize();
+            this.receiveBuffer.Initialize();
+
             // preallocate send pool
             SocketAsyncEventArgs sendEA;
-            for (int i = 0; i < Constants.MAX_NUM_CONNECTIONS; i++) {
+            for (int i = 0; i < Constants.MAX_ASYNC_SEND_OPS; i++) {
                 sendEA = new SocketAsyncEventArgs();
                 sendEA.Completed += new EventHandler<SocketAsyncEventArgs>(onSend_Completed);
-                this.buffer.Set(sendEA);
+                this.sendBuffer.Set(sendEA);
                 // assign transfer data object
                 SendToken token = new SendToken(sendEA);
                 sendEA.UserToken = token;
@@ -79,10 +82,10 @@ namespace KKClientServer.Networking {
 
             // preallocate receive pool
             SocketAsyncEventArgs receiveEA;
-            for (int i = 0; i < Constants.MAX_NUM_CONNECTIONS; i++) {
+            for (int i = 0; i < Constants.MAX_ASYNC_RECEIVE_OPS; i++) {
                 receiveEA = new SocketAsyncEventArgs();
                 receiveEA.Completed += new EventHandler<SocketAsyncEventArgs>(onReceive_Completed);
-                this.buffer.Set(receiveEA);
+                this.receiveBuffer.Set(receiveEA);
                 // assign transfer data object
                 ReceiveToken token = new ReceiveToken(receiveEA);
                 receiveEA.UserToken = token;
@@ -110,9 +113,8 @@ namespace KKClientServer.Networking {
         private void startAccepting() {
             SocketAsyncEventArgs acceptEA = getAcceptEventArgs();
             bool pending = serverSocket.AcceptAsync(acceptEA);
-            if (!pending) {
+            if (!pending)
                 processAccept(acceptEA);
-            }
         }
 
         /// <summary>
@@ -132,22 +134,36 @@ namespace KKClientServer.Networking {
         /// </summary>
         /// <param name="acceptEA">The accept event args.</param>
         private void processAccept(SocketAsyncEventArgs acceptEA) {
-            if (acceptEA.SocketError != SocketError.Success) {
-                acceptEA.AcceptSocket.Close();
-                this.acceptEventArgsPool.Push(acceptEA);
+            switch (acceptEA.SocketError) {
+                case SocketError.Success: 
+                    // continue accepting.
+                    startAccepting();
+
+                    // report back
+                    IPEndPoint client = acceptEA.AcceptSocket.RemoteEndPoint as IPEndPoint;
+                    controller.Print("\"" + client.Address + "\" connected.");
+
+                    // start receiving for accepted client connection
+                    SocketAsyncEventArgs receiveEA = getReceiveEventArgs(client);
+                    receiveEA.AcceptSocket = acceptEA.AcceptSocket;
+                    acceptEA.AcceptSocket = null;
+                    this.acceptEventArgsPool.Push(acceptEA);
+                    startReceiving(receiveEA);
+                    break;
+
+                case SocketError.OperationAborted:
+                    acceptEA.AcceptSocket.Close();
+                    this.acceptEventArgsPool.Push(acceptEA);
+                    break;
+
+                default:
+                    // continue accepting.
+                    startAccepting();
+
+                    acceptEA.AcceptSocket.Close();
+                    this.acceptEventArgsPool.Push(acceptEA);
+                    break;
             }
-            // continue accepting.
-            startAccepting();
-
-            // report back
-            IPEndPoint client = acceptEA.AcceptSocket.RemoteEndPoint as IPEndPoint;
-            controller.Print("\"" + client.Address + "\" connected.");
-
-            // start receiving for accepted client connection
-            SocketAsyncEventArgs receiveEA = getReceiveEventArgs(client);
-            receiveEA.AcceptSocket = acceptEA.AcceptSocket;
-            this.acceptEventArgsPool.Push(acceptEA);
-            startReceiving(receiveEA);
         }
         
         /// <summary>
@@ -174,7 +190,7 @@ namespace KKClientServer.Networking {
         private void startReceiving(SocketAsyncEventArgs receiveEA) {
             // set the buffer
             ReceiveToken token = (ReceiveToken)receiveEA.UserToken;
-            receiveEA.SetBuffer(token.ReceiveBufferOffset, Constants.BUFFER_SIZE);
+            receiveEA.SetBuffer(token.BufferOffset, Constants.BUFFER_SIZE);
 
             // post receive operation
             bool pending = receiveEA.AcceptSocket.ReceiveAsync(receiveEA);
@@ -216,7 +232,6 @@ namespace KKClientServer.Networking {
 
             // handle the prefix
             int bytesToProcess = receiveEA.BytesTransferred;
-            //Console.WriteLine("\nReceive> Received " + bytesToProcess + " bytes.");
             if (token.PrefixBytesReceived < Constants.PREFIX_SIZE) {
                 bytesToProcess = receiveHandler.HandlePrefix(receiveEA, token, bytesToProcess);
                 // post another receive operation in case prefix is incomplete
@@ -227,7 +242,6 @@ namespace KKClientServer.Networking {
             }
 
             // handle the text data
-            //Console.WriteLine("Receive> " + bytesToProcess + " text bytes to process.");
             if (token.TextBytesReceived < token.TextLength) {
                 bytesToProcess = receiveHandler.HandleText(receiveEA, token, bytesToProcess);
                 // post another receive operation in case text is incomplete
@@ -250,7 +264,7 @@ namespace KKClientServer.Networking {
 
                     token.Reset();
                 } else {
-                    token.FileOffset = token.ReceiveBufferOffset;
+                    token.FileOffset = token.BufferOffset;
                 }
             } else {
                 // report back                    
@@ -305,9 +319,8 @@ namespace KKClientServer.Networking {
         private void startConnecting(SocketAsyncEventArgs connectEA) {
             // post connect operation on the socket
             bool pending = connectEA.AcceptSocket.ConnectAsync(connectEA);
-            if (!pending) {
+            if (!pending)
                 processConnect(connectEA);
-            }
 
             // timeout
             Timer timer = new Timer();
@@ -378,7 +391,7 @@ namespace KKClientServer.Networking {
         /// Disconnects from a host.
         /// </summary>
         /// <param name="ip">The ip address.</param>
-        public void DisconnectFrom(string ip) {
+        internal void DisconnectFrom(string ip) {
             IPAddress address = IPAddress.Parse(ip);
             IPEndPoint remoteEP = new IPEndPoint(address, Constants.DEFAULT_PORT);
             // try to disconnect
@@ -386,13 +399,33 @@ namespace KKClientServer.Networking {
         }
 
         /// <summary>
+        /// Clean up routine on application exit.
+        /// </summary>
+        internal void Exit() {
+            // disconnect from all connected clients
+            foreach (KeyValuePair<IPEndPoint, SocketAsyncEventArgs> con in this.connections)
+                startDisconnecting(con.Value);
+            // close sockets and clear pools
+            this.connectEventArgsPool.Clear();
+            this.acceptEventArgsPool.Clear();
+            this.sendEventArgsPool.Clear();
+            this.receiveEventArgsPool.Clear();
+            // clear buffers
+            this.sendBuffer = null;
+            this.receiveBuffer = null;
+            // close server socket
+            this.serverSocket.Close();
+        }
+
+        /// <summary>
         /// Starts the disconnection process.
         /// </summary>
         /// <param name="saea">The event args.</param>
         private void startDisconnecting(SocketAsyncEventArgs saea) {
-            bool pending = saea.AcceptSocket.DisconnectAsync(saea);
-            if (!pending) {
-                processDisconnect(saea);
+            if (saea.AcceptSocket.Connected) {
+                bool pending = saea.AcceptSocket.DisconnectAsync(saea);
+                if (!pending)
+                    processDisconnect(saea);
             }
         }
 
@@ -461,33 +494,31 @@ namespace KKClientServer.Networking {
             int bytesSent = checkedConversion(token.BytesSent);
 
             // message fits into buffer
-            //Console.WriteLine("Send> Bytes left to send: " + bytesLeft);
             if (bytesLeft <= Constants.BUFFER_SIZE) {
-                sendEA.SetBuffer(token.SendBufferOffset, bytesLeft);
+                sendEA.SetBuffer(token.BufferOffset, bytesLeft);
                 Buffer.BlockCopy(
-                    token.TextData, bytesSent,
-                    sendEA.Buffer, token.SendBufferOffset,
+                    token.Data, bytesSent,
+                    sendEA.Buffer, token.BufferOffset,
                     bytesLeft);
                 byte[] array = new byte[bytesLeft];
-                Buffer.BlockCopy(sendEA.Buffer, token.SendBufferOffset, array, 0, bytesLeft);
-                //Console.WriteLine("Send> Sending bytes (complete): " + BitConverter.ToString(array) + "\n");
+                Buffer.BlockCopy(sendEA.Buffer, token.BufferOffset, array, 0, bytesLeft);
             }
             // message doesn't fit into buffer (send as much as possible)
             else {
-                sendEA.SetBuffer(token.SendBufferOffset, Constants.BUFFER_SIZE);
+                sendEA.SetBuffer(token.BufferOffset, Constants.BUFFER_SIZE);
                 Buffer.BlockCopy(
-                    token.TextData, bytesSent,
-                    sendEA.Buffer, token.SendBufferOffset,
+                    token.Data, bytesSent,
+                    sendEA.Buffer, token.BufferOffset,
                     Constants.BUFFER_SIZE);
                 byte[] array = new byte[Constants.BUFFER_SIZE];
-                Buffer.BlockCopy(sendEA.Buffer, token.SendBufferOffset, array, 0, Constants.BUFFER_SIZE);
-                //Console.WriteLine("Send> Sending bytes (incomplete): " + BitConverter.ToString(array) + "\n");
+                Buffer.BlockCopy(sendEA.Buffer, token.BufferOffset, array, 0, Constants.BUFFER_SIZE);
             }
 
             // post the send operation
-            bool pending = sendEA.AcceptSocket.SendAsync(sendEA);
-            if (!pending) {
-                processSendText(sendEA);
+            if (sendEA.AcceptSocket.Connected) {
+                bool pending = sendEA.AcceptSocket.SendAsync(sendEA);
+                if (!pending)
+                    processSendText(sendEA);
             }
         }
 
@@ -512,8 +543,24 @@ namespace KKClientServer.Networking {
             } else {
                 // a socket error occured
                 token.Reset();
-                startDisconnecting(sendEA);
+                processSendError(sendEA);
             }
+        }
+
+        /// <summary>
+        /// Processes send errors of given event args.
+        /// </summary>
+        /// <param name="sendEA">The send event args.</param>  
+        private void processSendError(SocketAsyncEventArgs sendEA) {
+            closeSocket(sendEA.AcceptSocket);
+            // release all resources
+            IPEndPoint remoteEP = sendEA.RemoteEndPoint as IPEndPoint;
+            string address = remoteEP.Address.ToString();
+            this.connections.Remove(remoteEP);
+            this.sendEventArgsPool.Push(sendEA);
+            // report back and visualize
+            controller.Print("Connection to host \"" + remoteEP.Address.ToString() + "\" has been lost.");
+            controller.Disconnected(address);
         }
 
         /// <summary>
@@ -549,11 +596,11 @@ namespace KKClientServer.Networking {
             // message fits into buffer
             if (token.RemainingBytesToSend <= Constants.BUFFER_SIZE) {
                 int bytesLeft = checkedConversion(token.RemainingBytesToSend);
-                sendEA.SetBuffer(token.SendBufferOffset, bytesLeft);
+                sendEA.SetBuffer(token.BufferOffset, bytesLeft);
             }
             // message doesn't fit into buffer (send as much as possible)
             else {
-                sendEA.SetBuffer(token.SendBufferOffset, Constants.BUFFER_SIZE);
+                sendEA.SetBuffer(token.BufferOffset, Constants.BUFFER_SIZE);
             }
             // handle prefix
             int fileDataToProcess = sendHandler.HandlePrefixAndFileName(sendEA, token);
@@ -561,9 +608,10 @@ namespace KKClientServer.Networking {
             bool success = sendHandler.HandleFile(sendEA, token, fileDataToProcess);
             if (success) {
                 // post the send operation
-                bool pending = sendEA.AcceptSocket.SendAsync(sendEA);
-                if (!pending) {
-                    processSendFile(sendEA);
+                if (sendEA.AcceptSocket.Connected) {
+                    bool pending = sendEA.AcceptSocket.SendAsync(sendEA);
+                    if (!pending)
+                        processSendFile(sendEA);
                 }
             } else {
                 // report back
@@ -602,9 +650,9 @@ namespace KKClientServer.Networking {
                 }
             } else {
                 // report back
-                controller.Print("A socket error occured while sending file \"" + token.Text + "\".");
+                controller.Print("File transfer incomplete.");
                 token.Reset();
-                startDisconnecting(sendEA);
+                processSendError(sendEA);
             }
         }
 

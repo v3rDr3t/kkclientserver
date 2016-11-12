@@ -5,7 +5,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KKClientServer.Networking {
+namespace ClientServer.Networking {
 
     public class SocketOperationPool {
         #region Fields (SocketOperationPool)
@@ -40,8 +40,6 @@ namespace KKClientServer.Networking {
                 throw new ArgumentNullException("Socket operation added to the pool must not be null!");
             }
             lock (this.pool) {
-                // clean and push
-                saea.AcceptSocket = null;
                 this.pool.Push(saea);
             }
         }
@@ -58,6 +56,30 @@ namespace KKClientServer.Networking {
                     return this.pool.Pop();
                 } else
                     return null;
+            }
+        }
+
+        /// <summary>
+        /// Removes event args from the pool.
+        /// </summary>
+        /// <returns>
+        /// The removed event args.
+        /// </returns>   
+        internal void Clear() {
+            int i = 0;
+            lock (this.pool) {
+                while (this.pool.Count > 0) {
+                    SocketAsyncEventArgs seae = this.pool.Pop();
+                    if (seae.AcceptSocket != null) {
+                        Console.WriteLine(++i + ": accept socket");
+                        seae.AcceptSocket.Close();
+                        seae.AcceptSocket = null;
+                    }
+                    if (seae.ConnectSocket != null) {
+                        Console.WriteLine(++i + ": connect socket");
+                        seae.ConnectSocket.Close();
+                    }
+                }
             }
         }
     }

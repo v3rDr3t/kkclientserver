@@ -3,7 +3,7 @@ using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
 
-namespace KKClientServer {
+namespace ClientServer {
 
     public partial class MainView : Form {
         #region Fields
@@ -23,18 +23,6 @@ namespace KKClientServer {
         /// <param name="controller">The controller.</param>
         internal void AddController(Controller controller) {
             this.controller = controller;
-        }
-
-        /// <summary>
-        /// Callback for main view closing.
-        /// </summary>
-        /// <param name="sender">The sender.</param>
-        /// <param name="e">The event.</param>
-        private void onMainView_Closing(object sender, FormClosingEventArgs e) {
-            // TODO: stop TCP listener
-            Print("Stopping server...");
-
-            // TODO: misc cleanup
         }
 
         /// <summary>
@@ -101,7 +89,7 @@ namespace KKClientServer {
         /// <param name="hostAddress">The host address.</param>
         private void initiateSendFile(string hostAddress) {
             FileInfo fileInfo = new FileInfo(this.sendFileTB.Text);
-            if (fileInfo.Length < int.MaxValue - Constants.PREFIX_SIZE) {
+            if (fileInfo.Name.Length < int.MaxValue - Constants.PREFIX_SIZE) {
                 // add item to list view
                 TabPage tabPage = this.fileTransferTabs.TabPages[hostAddress];
                 ListView listView = (ListView)tabPage.Controls["lv_" + hostAddress];
@@ -113,8 +101,8 @@ namespace KKClientServer {
                 Print("Initiate sending file \"" + this.sendFileTB.Text + "\"...");
                 controller.SendFileTo(hostAddress, fileInfo);
             } else {
-                Print("File \"" + this.sendFileTB.Text + "\" mustn't be bigger than "
-                    + (int.MaxValue - Constants.PREFIX_SIZE));
+                Print("File name \"" + this.sendFileTB.Text + "\" mustn't be longer than "
+                    + (int.MaxValue - Constants.PREFIX_SIZE) + " characters!");
             }
         }
 
@@ -127,24 +115,28 @@ namespace KKClientServer {
         internal void UpdateProgressOnFile(string ip, string fileName, double progress) {
             // get progress string
             int prog = Convert.ToInt32(progress * 100);
-            string progressString = prog  + "%";
+            string progressString = prog + "%";
 
             // handle main view modification from another thread
-            if (this.fileTransferTabs.InvokeRequired) {
-                UpdateProgressOnFile_Callback callback = new UpdateProgressOnFile_Callback(UpdateProgressOnFile);
-                this.Invoke(callback, new object[] { ip, fileName, progress });
-            } else {
-                TabPage tabPage = this.fileTransferTabs.TabPages[ip];
-                if (tabPage != null) {
-                    ListView listView = (ListView)tabPage.Controls["lv_" + ip];
-                    foreach (ListViewItem item in listView.Items) {
-                        if (item.SubItems[1].Text.Equals(fileName) && !item.SubItems[2].Text.Equals("100%")) {
-                            if (!item.SubItems[2].Text.Equals(progressString)) {
-                                item.SubItems[2].Text = progressString;
+            try {
+                if (this.fileTransferTabs.InvokeRequired) {
+                    UpdateProgressOnFile_Callback callback = new UpdateProgressOnFile_Callback(UpdateProgressOnFile);
+                    this.Invoke(callback, new object[] { ip, fileName, progress });
+                } else {
+                    TabPage tabPage = this.fileTransferTabs.TabPages[ip];
+                    if (tabPage != null) {
+                        ListView listView = (ListView)tabPage.Controls["lv_" + ip];
+                        foreach (ListViewItem item in listView.Items) {
+                            if (item.SubItems[1].Text.Equals(fileName) && !item.SubItems[2].Text.Equals("100%")) {
+                                if (!item.SubItems[2].Text.Equals(progressString)) {
+                                    item.SubItems[2].Text = progressString;
+                                }
                             }
                         }
                     }
                 }
+            } catch (ObjectDisposedException) {
+                // should only be caused on ungraceful application exit
             }
         }
 
@@ -182,7 +174,7 @@ namespace KKClientServer {
             // create tool strip button control
             ToolStripButton toolStripButton1 = new ToolStripButton();
             toolStripButton1.DisplayStyle = ToolStripItemDisplayStyle.Image;
-            toolStripButton1.Image = Properties.Resources.disconnect16;
+            toolStripButton1.Image = MultipleClientServer.Properties.Resources.disconnect16;
             toolStripButton1.ImageTransparentColor = Color.Magenta;
             toolStripButton1.Name = id;
             toolStripButton1.Size = new Size(23, 22);
@@ -197,7 +189,7 @@ namespace KKClientServer {
             // create tool strip button control
             ToolStripButton toolStripButton2 = new ToolStripButton();
             toolStripButton2.DisplayStyle = ToolStripItemDisplayStyle.Image;
-            toolStripButton2.Image = Properties.Resources.clear16;
+            toolStripButton2.Image = MultipleClientServer.Properties.Resources.clear16;
             toolStripButton2.ImageTransparentColor = Color.Magenta;
             toolStripButton2.Name = id;
             toolStripButton2.Size = new Size(23, 22);
@@ -286,15 +278,20 @@ namespace KKClientServer {
         /// <param name="ip">The host ip address.</param>
         internal void RemoveConnectionTab(string ip) {
             TabPage tabPage = this.fileTransferTabs.TabPages[ip];
+
             // handle main view modification from another thread
-            if (this.fileTransferTabs.InvokeRequired) {
-                RemoveTab_Callback callback = new RemoveTab_Callback(RemoveConnectionTab);
-                this.Invoke(callback, new object[] { ip });
-            } else {
-                if (tabPage != null) {
-                    this.fileTransferTabs.TabPages.Remove(tabPage);
-                    Print("Disconnected from \"" + ip + "\".");
+            try {
+                if (this.fileTransferTabs.InvokeRequired) {
+                    RemoveTab_Callback callback = new RemoveTab_Callback(RemoveConnectionTab);
+                    this.Invoke(callback, new object[] { ip });
+                } else {
+                    if (tabPage != null) {
+                        this.fileTransferTabs.TabPages.Remove(tabPage);
+                        Print("Disconnected from \"" + ip + "\".");
+                    }
                 }
+            } catch (ObjectDisposedException) {
+                // should only be caused on ungraceful application exit
             }
         }
 
@@ -306,12 +303,17 @@ namespace KKClientServer {
             string[] rowInfo = new string[2];
             rowInfo[0] = DateTime.Now.ToString(Constants.LOG_DATETIME_FORMAT);
             rowInfo[1] = msg;
+
             // handle main view modification from another thread
-            if (this.logLV.InvokeRequired) {
-                Print_Callback callback = new Print_Callback(Print);
-                this.Invoke(callback, new object[] { msg });
-            } else {
-                this.logLV.Items.Add(new ListViewItem(rowInfo));
+            try {
+                if (this.logLV.InvokeRequired) {
+                    Print_Callback callback = new Print_Callback(Print);
+                    this.Invoke(callback, new object[] { msg });
+                } else {
+                    this.logLV.Items.Add(new ListViewItem(rowInfo));
+                }
+            } catch (ObjectDisposedException) {
+                // should only be caused on ungraceful application exit
             }
         }
 

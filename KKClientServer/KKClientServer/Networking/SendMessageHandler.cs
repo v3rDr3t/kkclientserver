@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Net.Sockets;
 
-namespace KKClientServer.Networking {
+namespace ClientServer.Networking {
 
     internal class SendMessageHandler {
 
@@ -12,34 +12,40 @@ namespace KKClientServer.Networking {
         /// <param name="token">The user token of the event args.</param>
         /// <returns>The remainder of file bytes to send.</returns>
         internal int HandlePrefixAndFileName(SocketAsyncEventArgs sendEA, SendToken token) {
-            int bytesLeft = NetworkController.checkedConversion(token.RemainingBytesToSend);
-            int bytesSent = NetworkController.checkedConversion(token.BytesSent);
-
             // prefix and file name were already sent
             if (token.PrefixAndFileNameBytesToSend == 0) {
-                return (token.RemainingBytesToSend < Constants.BUFFER_SIZE)
-                    ? bytesLeft
-                    : Constants.BUFFER_SIZE;
+                if (token.RemainingBytesToSend < Constants.BUFFER_SIZE) {
+                    int bytesLeft = NetworkController.checkedConversion(token.RemainingBytesToSend);
+                    return bytesLeft;
+                } else {
+                    return Constants.BUFFER_SIZE;
+                }
             }
 
             // prefix and file name fit into buffer
             if (token.PrefixAndFileNameBytesToSend < Constants.BUFFER_SIZE) {
-                Buffer.BlockCopy(token.TextData,
+                int bytesSent = NetworkController.checkedConversion(token.BytesSent);
+                Buffer.BlockCopy(token.Data,
                     bytesSent,
                     sendEA.Buffer,
-                    token.SendBufferOffset,
+                    token.BufferOffset,
                     token.PrefixAndFileNameBytesToSend);
 
-                return (token.RemainingBytesToSend < Constants.BUFFER_SIZE)
-                    ? bytesLeft - token.PrefixAndFileNameBytesToSend
-                    : Constants.BUFFER_SIZE - token.PrefixAndFileNameBytesToSend;
+                if (token.RemainingBytesToSend < Constants.BUFFER_SIZE) {
+                    int bytesLeft = NetworkController.checkedConversion(token.RemainingBytesToSend);
+                    return bytesLeft - token.PrefixAndFileNameBytesToSend;
+                } else {
+                    return Constants.BUFFER_SIZE - token.PrefixAndFileNameBytesToSend;
+                }
             }
+
             // prefix and file name do not fit into buffer
             else {
-                Buffer.BlockCopy(token.TextData,
+                int bytesSent = NetworkController.checkedConversion(token.BytesSent);
+                Buffer.BlockCopy(token.Data,
                     bytesSent,
                     sendEA.Buffer,
-                    token.SendBufferOffset,
+                    token.BufferOffset,
                     Constants.BUFFER_SIZE);
                 return 0;
             }
@@ -53,15 +59,15 @@ namespace KKClientServer.Networking {
         internal bool HandleFile(SocketAsyncEventArgs sendEA, SendToken token, int fileDataToProcess) {
             if (fileDataToProcess > 0) {
                 try {
-                    Console.WriteLine("Send> Processing " + fileDataToProcess + " bytes of file data...");
+                    //Console.WriteLine("Send> Processing " + fileDataToProcess + " bytes of file data...");
                     // read part of file into buffer
                     int bytesToRead = fileDataToProcess;
                     int offset = (token.PrefixAndFileNameBytesToSend > 0)
-                        ? token.SendBufferOffset + token.PrefixAndFileNameBytesToSend
-                        : token.SendBufferOffset;
+                        ? token.BufferOffset + token.PrefixAndFileNameBytesToSend
+                        : token.BufferOffset;
                     while (bytesToRead > 0) {
                         int bytesRead = token.FileStream.Read(sendEA.Buffer, offset, bytesToRead);
-                        Console.WriteLine("Send> Read " + bytesRead + " bytes. Offset = " + token.FileStream.Position);
+                        //Console.WriteLine("Send> Read " + bytesRead + " bytes. Offset = " + token.FileStream.Position);
                         if (bytesRead == 0)
                             break;
                         offset += bytesRead;

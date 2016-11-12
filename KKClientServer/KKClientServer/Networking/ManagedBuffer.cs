@@ -5,7 +5,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KKClientServer.Networking {
+namespace ClientServer.Networking {
 
     /// <summary>
     /// This class is a large reusable buffer for socket I/O operations.
@@ -49,6 +49,7 @@ namespace KKClientServer.Networking {
         /// <code>True</code> if the buffer was successfully set, <code>false</code> otherwise.
         /// </returns>
         internal bool Set(SocketAsyncEventArgs saea) {
+            // in case buffer was freed
             if (this.freeIndexPool.Count > 0) {
                 saea.SetBuffer(this.buffer, this.freeIndexPool.Pop(), this.bytesAllocated);
             } else {
