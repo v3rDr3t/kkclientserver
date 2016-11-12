@@ -76,11 +76,10 @@
             this.selectServerTB.Name = "selectServerTB";
             this.selectServerTB.Size = new System.Drawing.Size(428, 20);
             this.selectServerTB.TabIndex = 3;
-            this.selectServerTB.Text = "192.168.13.24";
             // 
             // clientConnectBtn
             // 
-            this.clientConnectBtn.Image = MultipleClientServer.Properties.Resources.connect16;
+            this.clientConnectBtn.Image = global::MultipleClientServer.Properties.Resources.connect16;
             this.clientConnectBtn.Location = new System.Drawing.Point(522, 19);
             this.clientConnectBtn.Name = "clientConnectBtn";
             this.clientConnectBtn.Size = new System.Drawing.Size(24, 24);
@@ -91,7 +90,7 @@
             // 
             // sendFileTB
             // 
-            this.sendFileTB.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)
+            this.sendFileTB.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.sendFileTB.Location = new System.Drawing.Point(50, 272);
             this.sendFileTB.Name = "sendFileTB";
@@ -100,7 +99,7 @@
             // 
             // sendTextTB
             // 
-            this.sendTextTB.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)
+            this.sendTextTB.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.sendTextTB.Location = new System.Drawing.Point(50, 244);
             this.sendTextTB.Name = "sendTextTB";
@@ -129,7 +128,7 @@
             // 
             // logGB
             // 
-            this.logGB.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)
+            this.logGB.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.logGB.Controls.Add(this.logLV);
             this.logGB.Location = new System.Drawing.Point(12, 387);
@@ -141,9 +140,9 @@
             // 
             // logLV
             // 
-            this.logLV.Anchor = ((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
-            | System.Windows.Forms.AnchorStyles.Left)
-            | System.Windows.Forms.AnchorStyles.Right));
+            this.logLV.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
             this.logLV.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.logTimeCol,
             this.logMessageCol});
@@ -166,9 +165,9 @@
             // 
             // connectionsGB
             // 
-            this.connectionsGB.Anchor = ((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
-            | System.Windows.Forms.AnchorStyles.Left)
-            | System.Windows.Forms.AnchorStyles.Right));
+            this.connectionsGB.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
             this.connectionsGB.Controls.Add(this.fileTransferTabs);
             this.connectionsGB.Controls.Add(this.sendTextTB);
             this.connectionsGB.Controls.Add(this.browseFileBtn);
@@ -185,10 +184,10 @@
             // 
             // fileTransferTabs
             // 
-            this.fileTransferTabs.Anchor = ((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
-            | System.Windows.Forms.AnchorStyles.Left)
-            | System.Windows.Forms.AnchorStyles.Right));
-            this.fileTransferTabs.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, 0);
+            this.fileTransferTabs.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.fileTransferTabs.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.fileTransferTabs.ItemSize = new System.Drawing.Size(80, 20);
             this.fileTransferTabs.Location = new System.Drawing.Point(16, 19);
             this.fileTransferTabs.Name = "fileTransferTabs";
@@ -198,8 +197,8 @@
             // 
             // browseFileBtn
             // 
-            this.browseFileBtn.Anchor = (System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right);
-            this.browseFileBtn.Image = MultipleClientServer.Properties.Resources.browse16;
+            this.browseFileBtn.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.browseFileBtn.Image = global::MultipleClientServer.Properties.Resources.browse16;
             this.browseFileBtn.Location = new System.Drawing.Point(466, 270);
             this.browseFileBtn.Name = "browseFileBtn";
             this.browseFileBtn.Size = new System.Drawing.Size(24, 24);
@@ -210,8 +209,8 @@
             // 
             // sendBtn
             // 
-            this.sendBtn.Anchor = (System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right);
-            this.sendBtn.Image = MultipleClientServer.Properties.Resources.send32;
+            this.sendBtn.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.sendBtn.Image = global::MultipleClientServer.Properties.Resources.send32;
             this.sendBtn.Location = new System.Drawing.Point(496, 244);
             this.sendBtn.Name = "sendBtn";
             this.sendBtn.Size = new System.Drawing.Size(50, 50);
